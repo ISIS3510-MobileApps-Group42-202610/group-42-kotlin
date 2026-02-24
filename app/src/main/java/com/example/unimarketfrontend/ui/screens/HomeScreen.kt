@@ -11,55 +11,76 @@ import androidx.compose.ui.unit.dp
 import com.example.unimarketfrontend.ui.components.CategoryChip
 import com.example.unimarketfrontend.ui.components.TrendingCard
 import com.example.unimarketfrontend.ui.components.HeaderSection
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import com.example.unimarketfrontend.viewmodel.HomeViewModel
+import com.example.unimarketfrontend.viewmodel.HomeUiState
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 80.dp)
-    ) {
-
-        item {
-            HeaderSection(userName = "Sebastián")
-        }
-
-        item {
-            Spacer(Modifier.height(25.dp))
-            Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                CategoryChip("Textbooks", "124 items")
-                CategoryChip("Electronics", "89 items")
-                CategoryChip("Lab Equip", "45 items")
+fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+    val state by viewModel.uiState.collectAsState()
+    when (state) {
+        is HomeUiState.Loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
         }
 
-        item {
-            Text(
-                text = "Trending Now",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(16.dp)
-            )
+        is HomeUiState.Error -> {
+            Text("Error loading data")
         }
 
-        item {
-            Row(
-                modifier = Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(start = 16.dp)
+        is HomeUiState.Success -> {
+
+            val data = state as HomeUiState.Success
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 80.dp)
             ) {
 
-                TrendingCard(
-                    imageUrl = "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f",
-                    title = "Calculus - James Stewart",
-                    price = "$85.000",
-                    condition = "Good"
-                )
+                item {
+                    HeaderSection(userName = data.userName)
+                }
 
-                TrendingCard(
-                    imageUrl = "https://images.unsplash.com/photo-1519389950473-47ba0277781c",
-                    title = "TI-84 Plus",
-                    price = "$180.000",
-                    condition = "Like New"
-                )
+                item {
+                    Spacer(Modifier.height(25.dp))
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                    ) {
+                        data.categories.forEach {
+                            CategoryChip(it.name, "${it.count} items")
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        text = "Trending Now",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(start = 16.dp)
+                    ) {
+                        data.listings.forEach { listing ->
+                            TrendingCard(
+                                imageUrl = listing.images?.firstOrNull()?.url ?: "",
+                                title = listing.title,
+                                price = "$${listing.selling_price}",
+                                condition = listing.condition ?: "Unknown"
+                            )
+                        }
+                    }
+                }
             }
         }
     }
