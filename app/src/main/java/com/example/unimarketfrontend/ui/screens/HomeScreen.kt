@@ -2,67 +2,63 @@ package com.example.unimarketfrontend.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.ExperimentalMaterial3Api
+import com.example.unimarketfrontend.ui.components.CategoryChip
+import com.example.unimarketfrontend.ui.components.TrendingCard
 import com.example.unimarketfrontend.ui.components.HeaderSection
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp)
+    ) {
 
-    var searchText by remember { mutableStateOf("") }
+        item {
+            HeaderSection(userName = "Sebastián")
+        }
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {},
-                containerColor = Color.Blue,
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null
-                )
+        item {
+            Spacer(Modifier.height(25.dp))
+            Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                CategoryChip("Textbooks", "124 items")
+                CategoryChip("Electronics", "89 items")
+                CategoryChip("Lab Equip", "45 items")
             }
         }
-    ) { padding ->
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        item {
+            Text(
+                text = "Trending Now",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
 
-            item {
-                HeaderSection()
-            }
+        item {
+            Row(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(start = 16.dp)
+            ) {
 
-            item {
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    text = "Trending Now",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.titleMedium
+                TrendingCard(
+                    imageUrl = "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f",
+                    title = "Calculus - James Stewart",
+                    price = "$85.000",
+                    condition = "Good"
                 )
-            }
 
-            item {
-                OutlinedTextField(
-                    value = searchText,
-                    onValueChange = { searchText = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    placeholder = { Text("Search...") }
+                TrendingCard(
+                    imageUrl = "https://images.unsplash.com/photo-1519389950473-47ba0277781c",
+                    title = "TI-84 Plus",
+                    price = "$180.000",
+                    condition = "Like New"
                 )
             }
         }
