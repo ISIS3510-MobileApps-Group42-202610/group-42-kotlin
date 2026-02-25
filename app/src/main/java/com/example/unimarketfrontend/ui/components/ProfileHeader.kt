@@ -52,8 +52,6 @@ fun ProfileHeader() {
 
             Spacer(Modifier.height(20.dp))
 
-            Divider()
-
             Spacer(Modifier.height(16.dp))
 
             Row(
