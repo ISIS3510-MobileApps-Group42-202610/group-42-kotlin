@@ -17,10 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import com.example.unimarketfrontend.viewmodel.HomeViewModel
 import com.example.unimarketfrontend.viewmodel.HomeUiState
-import com.example.unimarketfrontend.ui.components.BottomNavigationBar
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
@@ -37,20 +33,11 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         }
 
         is HomeUiState.Success -> {
-            val currentRoute = remember{ mutableStateOf("home") }
 
             val data = state as HomeUiState.Success
-            Scaffold(bottomBar = {
 
-                BottomNavigationBar(currentRoute = currentRoute.value,
-                    onRouteChange = { newRoute ->
-                        currentRoute.value = newRoute
-                    })
-            }){innerPadding ->
             LazyColumn(
-               modifier = Modifier
-                   .fillMaxSize()
-                   .padding(innerPadding),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
 
@@ -94,9 +81,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                         }
                     }
                 }
-
             }
-        }
         }
     }
 }
