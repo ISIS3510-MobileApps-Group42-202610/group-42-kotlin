@@ -20,10 +20,11 @@ import com.example.unimarketfrontend.viewmodel.HomeUiState
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
     when (state) {
         is HomeUiState.Loading -> {
@@ -40,11 +41,13 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
             val currentRoute = remember{ mutableStateOf("home") }
 
             val data = state as HomeUiState.Success
-            Scaffold(bottomBar = {
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                bottomBar = {
 
-                BottomNavigationBar(currentRoute = currentRoute.value,
-                    onRouteChange = { newRoute ->
-                        currentRoute.value = newRoute
+                BottomNavigationBar(currentRoute = "home",
+                    onRouteChange = { route ->
+                        navController.navigate(route)
                     })
             }){innerPadding ->
             LazyColumn(

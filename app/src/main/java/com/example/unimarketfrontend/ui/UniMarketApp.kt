@@ -1,7 +1,8 @@
 package com.example.unimarketfrontend.ui
+
 import androidx.compose.runtime.*
-import com.example.unimarketfrontend.ui.screens.HomeScreen
-import com.example.unimarketfrontend.ui.screens.LoginScreen
+import androidx.navigation.compose.*
+import com.example.unimarketfrontend.ui.screens.*
 
 @Composable
 fun UniMarketApp() {
@@ -9,12 +10,33 @@ fun UniMarketApp() {
     var isLoggedIn by remember { mutableStateOf(false) }
 
     if (!isLoggedIn) {
+
         LoginScreen(
             onLoginSuccess = {
                 isLoggedIn = true
             }
         )
+
     } else {
-        HomeScreen()
+
+        val navController = rememberNavController()
+
+        NavHost(
+            navController = navController,
+            startDestination = "home"
+        ) {
+
+            composable("home") {
+                HomeScreen(navController)
+            }
+
+            composable("profile") {
+                ProfileScreen(navController)
+            }
+
+            composable("search") { }
+
+            composable("messages") { }
+        }
     }
 }
