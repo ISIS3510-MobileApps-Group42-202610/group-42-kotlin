@@ -33,6 +33,12 @@ fun UniMarketApp() {
             composable("profile") {
                 ProfileScreen(navController)
             }
+            composable("manage") {
+                ManageProductsScreen(navController)
+            }
+            composable("createListing") {
+                HomeScreen(navController)
+            }
 
             composable("search") { }
 
