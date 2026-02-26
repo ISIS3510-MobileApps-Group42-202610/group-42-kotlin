@@ -10,3 +10,12 @@ data class Message(
     val is_read: Boolean
 )
 
+data class ConversationPreview(
+    val otherPersonName: String,
+    val lastMessage: String,
+    val lastMessageTime: String,
+    val isRead: Boolean
+)
+
+
+

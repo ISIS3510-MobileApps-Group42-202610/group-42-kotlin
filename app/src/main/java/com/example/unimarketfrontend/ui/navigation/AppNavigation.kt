@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.*
 import com.example.unimarketfrontend.ui.screens.HomeScreen
 import com.example.unimarketfrontend.ui.screens.ProfileScreen
+import com.example.unimarketfrontend.ui.screens.MessagesScreen
+
 
 @Composable
 fun AppNavigation() {
@@ -23,14 +25,14 @@ fun AppNavigation() {
             ProfileScreen(navController)
         }
 
-        composable("manage") {
-            // Change with the new screen
-            HomeScreen(navController)
-        }
-
         composable("messages") {
-            // Change with the new screen
-            HomeScreen(navController)
+            MessagesScreen(navController)
+        }
+        composable("search") {
+            HomeScreen(navController) // TODO: crear SearchScreen
+        }
+        composable("manage") {
+            HomeScreen(navController) // TODO: crear ManageScreen
         }
     }
 }
