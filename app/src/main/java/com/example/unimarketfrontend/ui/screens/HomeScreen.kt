@@ -20,6 +20,7 @@ import com.example.unimarketfrontend.viewmodel.HomeUiState
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import androidx.navigation.NavController
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewModel()) {
