@@ -17,9 +17,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import com.example.unimarketfrontend.viewmodel.HomeViewModel
 import com.example.unimarketfrontend.viewmodel.HomeUiState
+import com.example.unimarketfrontend.ui.components.BottomNavigationBar
+import androidx.navigation.NavController
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
     when (state) {
         is HomeUiState.Loading -> {
@@ -35,9 +38,19 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         is HomeUiState.Success -> {
 
             val data = state as HomeUiState.Success
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                bottomBar = {
 
+                BottomNavigationBar(currentRoute = "home",
+                    onRouteChange = { route ->
+                        navController.navigate(route)
+                    })
+            }){innerPadding ->
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+               modifier = Modifier
+                   .fillMaxSize()
+                   .padding(innerPadding),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
 
@@ -81,7 +94,9 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                         }
                     }
                 }
+
             }
+        }
         }
     }
 }
