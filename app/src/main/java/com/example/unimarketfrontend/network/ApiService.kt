@@ -21,7 +21,10 @@ interface ApiService {
     suspend fun getListings(): Response<List<Listing>>
     @GET("api/v1/listings/my")
     suspend fun getMyListings(): Response<MyListingsResponse>
-
+    @POST("api/v1/listings")
+    suspend fun createListing(
+        @Body request: CreateListingRequest
+    ): Response<Listing>
     @GET("api/v1/users/me")
     suspend fun getMe(): User
     @GET("api/v1/listings/home/ranking")

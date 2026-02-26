@@ -37,8 +37,7 @@ fun UniMarketApp() {
                 ManageProductsScreen(navController)
             }
             composable("createListing") {
-                HomeScreen(navController)
-            }
+                CreateListingScreen(navController)}
 
             composable("search") { }
 
