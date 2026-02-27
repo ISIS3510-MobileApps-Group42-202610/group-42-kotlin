@@ -6,6 +6,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import com.example.unimarketfrontend.network.model.User
+import com.example.unimarketfrontend.network.model.Message
 
 
 interface ApiService {
@@ -20,3 +21,11 @@ interface ApiService {
     @GET("api/v1/users/me")
     suspend fun getMe(): User
 }
+// TODO: Revisar cómo funciona el bsackend y conectar
+// @GET("api/v1/messages/as-buyer")
+// suspend fun getMessagesAsBuyer(): List<Message>
+//}
+//    @POST("api/v1/messages")
+//    suspend fun sendMessage(
+//        @Body request: MessageRequest
+//    ): MessageResponse
