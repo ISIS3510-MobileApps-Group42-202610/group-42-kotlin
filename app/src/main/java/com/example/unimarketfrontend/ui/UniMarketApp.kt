@@ -36,7 +36,9 @@ fun UniMarketApp() {
 
             composable("search") { }
 
-            composable("messages") { }
+            composable("messages") {
+                MessagesScreen(navController)
+            }
         }
     }
 }
