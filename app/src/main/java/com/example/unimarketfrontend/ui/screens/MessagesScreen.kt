@@ -105,7 +105,14 @@ fun MessagesScreen(
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             items(conversations) { conversation ->
-                                ConversationRow(conversation = conversation)
+                                ConversationRow(
+                                    conversation = conversation,
+                                    onClick = {
+                                        navController.navigate(
+                                            "chat/${conversation.otherPersonId}/${conversation.otherPersonName}"
+                                        )
+                                    }
+                                )
                                 HorizontalDivider(
                                     modifier = Modifier.padding(start = 76.dp),
                                     color = MaterialTheme.colorScheme.outlineVariant
