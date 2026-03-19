@@ -12,16 +12,17 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.unimarketfrontend.viewmodel.LoginViewModel
+import com.example.unimarketfrontend.viewmodel.RegisterViewModel
 
 @Composable
-fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    onNavigateToRegister: () -> Unit = {},
-    onNavigateToForgotPassword: () -> Unit = {}
+fun RegisterScreen(
+    onRegisterSuccess: () -> Unit = {},
+    onNavigateToLogin: () -> Unit = {}
 ) {
-    val viewModel: LoginViewModel = viewModel()
+    val viewModel: RegisterViewModel = viewModel()
 
+    var name      by remember { mutableStateOf("") }
+    var lastName  by remember { mutableStateOf("") }
     var email     by remember { mutableStateOf("") }
     var password  by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -42,7 +43,49 @@ fun LoginScreen(
             color = Color(0xFF5C6BC0)
         )
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = "Create your account",
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+
+        Spacer(Modifier.height(28.dp))
+
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it; errorMsg = null },
+            label = { Text("Name") },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                focusedLabelColor = Color(0xFF5C6BC0),
+                unfocusedLabelColor = Color.Gray
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = lastName,
+            onValueChange = { lastName = it; errorMsg = null },
+            label = { Text("Last Name") },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                focusedLabelColor = Color(0xFF5C6BC0),
+                unfocusedLabelColor = Color.Gray
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(12.dp))
 
         OutlinedTextField(
             value = email,
@@ -64,7 +107,7 @@ fun LoginScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it; errorMsg = null },
-            label = { Text("Password") },
+            label = { Text("Password (min. 6 characters)") },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -86,15 +129,24 @@ fun LoginScreen(
 
         Button(
             onClick = {
-                if (email.isBlank() || password.isBlank()) {
-                    errorMsg = "Please complete all the fields"
-                    return@Button
+                when {
+                    name.isBlank() || lastName.isBlank() -> errorMsg = "Name and Last Name are required"
+                    email.isBlank()                      -> errorMsg = "Email is required"
+                    password.length < 6                  -> errorMsg = "Password needs at least 6 characters"
+                    else -> {
+                        isLoading = true
+                        viewModel.register(
+                            name     = name,
+                            lastName = lastName,
+                            email    = email,
+                            password = password,
+                            semester = null,
+                            isSeller = false,
+                            onSuccess = { isLoading = false; onRegisterSuccess() },
+                            onError   = { msg -> isLoading = false; errorMsg = msg }
+                        )
+                    }
                 }
-                isLoading = true
-                viewModel.login(email, password,
-                    onSuccess = { isLoading = false; onLoginSuccess() },
-                    onError   = { isLoading = false; errorMsg = "Wrong email or password!!!" }
-                )
             },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = RoundedCornerShape(50),
@@ -102,17 +154,13 @@ fun LoginScreen(
             enabled = !isLoading
         ) {
             if (isLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
-            else Text("Login", color = Color.White, fontWeight = FontWeight.SemiBold)
+            else Text("Register", color = Color.White, fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(Modifier.height(12.dp))
 
-        TextButton(onClick = onNavigateToForgotPassword) {
-            Text("Forgot your password?", color = Color(0xFF5C6BC0))
-        }
-
-        TextButton(onClick = onNavigateToRegister) {
-            Text("Don't you have an account? Register now!", color = Color(0xFF5C6BC0))
+        TextButton(onClick = onNavigateToLogin) {
+            Text("Already have an account? Login now", color = Color(0xFF5C6BC0))
         }
     }
 }

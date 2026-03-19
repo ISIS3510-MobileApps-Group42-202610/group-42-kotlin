@@ -11,11 +11,34 @@ fun UniMarketApp() {
 
     if (!isLoggedIn) {
 
-        LoginScreen(
-            onLoginSuccess = {
-                isLoggedIn = true
+        val authNavController = rememberNavController()
+
+        NavHost(
+            navController = authNavController,
+            startDestination = "login"
+        ) {
+
+            composable("login") {
+                LoginScreen(
+                    onLoginSuccess = { isLoggedIn = true },
+                    onNavigateToRegister = { authNavController.navigate("register") },
+                    onNavigateToForgotPassword = { authNavController.navigate("forgot_password") }
+                )
             }
-        )
+
+            composable("register") {
+                RegisterScreen(
+                    onRegisterSuccess = { authNavController.navigate("login") },
+                    onNavigateToLogin = { authNavController.navigate("login") }
+                )
+            }
+
+            composable("forgot_password") {
+                ForgotPasswordScreen(
+                    onNavigateToLogin = { authNavController.navigate("login") }
+                )
+            }
+        }
 
     } else {
 
