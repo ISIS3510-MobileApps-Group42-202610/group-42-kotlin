@@ -1,6 +1,7 @@
 package com.example.unimarketfrontend.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,7 +20,6 @@ import com.example.unimarketfrontend.network.model.ConversationPreview
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import com.example.unimarketfrontend.viewmodel.MessagesUiState
 import com.example.unimarketfrontend.viewmodel.MessagesViewModel
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,8 +71,6 @@ fun MessagesScreen(
                             text = "Could not load messages",
                             color = MaterialTheme.colorScheme.error
                         )
-
-
                     }
                 }
 
@@ -127,14 +125,14 @@ fun MessagesScreen(
 }
 
 @Composable
-fun ConversationRow(conversation: ConversationPreview) {
+fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
         Box(
             modifier = Modifier
                 .size(50.dp)
@@ -155,7 +153,6 @@ fun ConversationRow(conversation: ConversationPreview) {
         Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -185,6 +182,7 @@ fun ConversationRow(conversation: ConversationPreview) {
                     MaterialTheme.colorScheme.outline
             )
         }
+
         if (!conversation.isRead) {
             Spacer(Modifier.width(8.dp))
             Box(

@@ -17,7 +17,7 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val response = RetrofitInstance.api.login(LoginRequest(email, password))
-
+                // Store the JWT token in the Retrofit interceptor
                 RetrofitInstance.setToken(response.access_token)
                 onSuccess()
             } catch (e: Exception) {

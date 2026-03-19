@@ -17,8 +17,7 @@ interface AnalyticsApiService {
 object AnalyticsRetrofitInstance {
 
     // Replace with the deployed analytics engine URL
-    //CAMBIAR ANALYTICS RETROFITINSTANCE, ESTÁ MAL
-    private const val ANALYTICS_BASE_URL = "https://your-analytics-engine.vercel.app/"
+    private const val ANALYTICS_BASE_URL = "https://group-42-analytic-engine-back.vercel.app/"
 
     val api: AnalyticsApiService by lazy {
         Retrofit.Builder()
