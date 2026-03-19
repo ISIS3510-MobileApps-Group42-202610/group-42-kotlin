@@ -1,6 +1,6 @@
 package com.example.unimarketfrontend.ui.components
 
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -12,13 +12,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.unimarketfrontend.network.model.Listing
 
 @Composable
 fun TrendingCard(
     imageUrl: String,
     title: String,
     price: String,
-    condition: String
+    condition: String,
+    onClick: () -> Unit = {}
 ) {
 
     Card(
@@ -27,6 +29,7 @@ fun TrendingCard(
         modifier = Modifier
             .width(180.dp)
             .padding(end = 12.dp)
+            .clickable { onClick() }
     ) {
 
         Column {
@@ -64,3 +67,4 @@ fun TrendingCard(
         }
     }
 }
+

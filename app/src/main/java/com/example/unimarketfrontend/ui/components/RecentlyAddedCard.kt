@@ -1,6 +1,7 @@
 package com.example.unimarketfrontend.ui.components
 
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -14,12 +15,13 @@ import coil.compose.AsyncImage
 import com.example.unimarketfrontend.network.model.Listing
 
 @Composable
-fun RecentlyAddedCard(listing: Listing) {
+fun RecentlyAddedCard(listing: Listing, onClick: () -> Unit = {}) {
     Card(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier.padding(16.dp)

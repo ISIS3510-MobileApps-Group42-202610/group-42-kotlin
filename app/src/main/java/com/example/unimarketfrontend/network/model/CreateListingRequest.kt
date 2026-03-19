@@ -7,5 +7,6 @@ data class CreateListingRequest(
     val condition: String?,
     val original_price: Double?,
     val selling_price: Double,
-    val course_id: Int?
+    val course_id: Int?,
+    val images: List<Map<String, Any>>? = null
 )
