@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.network.CloudinaryUploadService
 import com.example.unimarketfrontend.network.RetrofitInstance
-import com.example.unimarketfrontend.network.model.AddImageRequest
 import com.example.unimarketfrontend.network.model.CloudinarySignatureRequest
 import com.example.unimarketfrontend.network.model.CreateListingRequest
 import com.example.unimarketfrontend.network.model.Listing
@@ -119,7 +118,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         imageUris.forEachIndexed { index, uri ->
             _state.value = CreateListingState.UploadingImages(index, imageUris.size)
 
-            val imageUrl = withContext(Dispatchers.IO) {
+            val imageUrl: String = withContext(Dispatchers.IO) {
                 CloudinaryUploadService.uploadImage(
                     contentResolver = contentResolver,
                     imageUri = uri,
