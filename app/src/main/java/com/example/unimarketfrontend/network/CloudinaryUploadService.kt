@@ -11,6 +11,16 @@ import java.util.UUID
 
 object CloudinaryUploadService {
 
+    /**
+     * Carga una imagen a Cloudinary usando autenticación firmada.
+     *
+     * @param contentResolver Resolvedor para acceder al contenido del dispositivo
+     * @param imageUri URI de la imagen seleccionada por el usuario
+     * @param signature Datos de autenticación (apiKey, timestamp, firma de seguridad)
+     * @return URL segura de la imagen alojada en Cloudinary
+     * @throws IllegalArgumentException Si no se puede leer la imagen
+     * @throws IllegalStateException Si Cloudinary rechaza la petición o no devuelve la URL
+     */
     fun uploadImage(
         contentResolver: ContentResolver,
         imageUri: Uri,
@@ -36,42 +46,50 @@ object CloudinaryUploadService {
 
         try {
             DataOutputStream(connection.outputStream).use { out ->
+                // Enviar credenciales de seguridad
+
                 writeTextPart(out, boundary, "api_key", signature.apiKey)
                 writeTextPart(out, boundary, "timestamp", signature.timestamp.toString())
                 writeTextPart(out, boundary, "signature", signature.signature)
+                //Organizar imágenes en Cloudinary
+
                 if (!signature.folder.isNullOrBlank()) {
                     writeTextPart(out, boundary, "folder", signature.folder)
                 }
+                //Enviamos la imagen binaria a Cloudinary
                 writeFilePart(out, boundary, "file", fileName, mimeType, imageBytes)
+                //Cierre del formulario - OutputStream
                 out.writeBytes("--$boundary--\r\n")
                 out.flush()
             }
-
+                //Validación respuesta HTTP
             val responseCode = connection.responseCode
             val responseText = if (responseCode in 200..299) {
                 connection.inputStream.bufferedReader().use { it.readText() }
             } else {
                 connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
             }
-
+            //Manejo de errores de la respuesta de Cloudinary
             if (responseCode !in 200..299) {
                 throw IllegalStateException("Cloudinary upload fallo (HTTP $responseCode): $responseText")
             }
-
+            //Extraer y retornar la URL segura de respuesta
             val json = JSONObject(responseText)
             return json.optString("secure_url").takeIf { it.isNotBlank() }
                 ?: throw IllegalStateException("Cloudinary no devolvio secure_url")
         } finally {
+            //Cierrre de conexión
             connection.disconnect()
         }
     }
-
+//Escritura de campo de texto en formato multipart/form-data
     private fun writeTextPart(out: DataOutputStream, boundary: String, name: String, value: String) {
         out.writeBytes("--$boundary\r\n")
         out.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
         out.writeBytes(value)
         out.writeBytes("\r\n")
     }
+//Escritura de imagen en formato multipart/form-data
 
     private fun writeFilePart(
         out: DataOutputStream,
