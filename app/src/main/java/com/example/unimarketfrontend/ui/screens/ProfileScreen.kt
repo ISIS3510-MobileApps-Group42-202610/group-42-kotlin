@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import com.example.unimarketfrontend.ui.components.ProfileHeader
+import com.example.unimarketfrontend.ui.navigation.navigateTracked
 
 @Composable
 fun ProfileScreen(navController: NavController) {
@@ -19,7 +20,7 @@ fun ProfileScreen(navController: NavController) {
             BottomNavigationBar(
                 currentRoute = "profile",
                 onRouteChange = { route ->
-                    navController.navigate(route) {
+                    navController.navigateTracked(route) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }
