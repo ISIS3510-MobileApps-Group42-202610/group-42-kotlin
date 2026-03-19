@@ -1,5 +1,7 @@
 package com.example.unimarketfrontend.analytics
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.example.unimarketfrontend.network.AnalyticsRetrofitInstance
 import com.example.unimarketfrontend.network.model.AnalyticsEvent
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +20,7 @@ object AnalyticsLogger {
     }
 
     // Sends an event asynchronously without blocking the UI
+    @RequiresApi(Build.VERSION_CODES.O)
     fun log(eventName: String, properties: Map<String, String> = emptyMap()) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
