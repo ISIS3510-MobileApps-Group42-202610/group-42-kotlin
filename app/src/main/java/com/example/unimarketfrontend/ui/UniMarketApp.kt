@@ -1,8 +1,8 @@
 package com.example.unimarketfrontend.ui
 
 import androidx.compose.runtime.*
-import androidx.navigation.compose.*
-import com.example.unimarketfrontend.ui.screens.*
+import com.example.unimarketfrontend.ui.navigation.AppNavigation
+import com.example.unimarketfrontend.ui.screens.LoginScreen
 
 @Composable
 fun UniMarketApp() {
@@ -18,27 +18,6 @@ fun UniMarketApp() {
         )
 
     } else {
-
-        val navController = rememberNavController()
-
-        NavHost(
-            navController = navController,
-            startDestination = "home"
-        ) {
-
-            composable("home") {
-                HomeScreen(navController)
-            }
-
-            composable("profile") {
-                ProfileScreen(navController)
-            }
-
-            composable("search") { }
-
-            composable("messages") {
-                MessagesScreen(navController)
-            }
-        }
+        AppNavigation()
     }
 }
