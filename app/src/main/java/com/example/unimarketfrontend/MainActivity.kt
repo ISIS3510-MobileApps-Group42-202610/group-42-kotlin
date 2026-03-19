@@ -26,6 +26,7 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import com.example.unimarketfrontend.ui.theme.UniMarketFrontendTheme
 import com.example.unimarketfrontend.ui.UniMarketApp
 
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

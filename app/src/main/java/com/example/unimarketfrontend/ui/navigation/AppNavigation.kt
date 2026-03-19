@@ -11,6 +11,8 @@ import com.example.unimarketfrontend.ui.screens.HomeScreen
 import com.example.unimarketfrontend.ui.screens.ListingDetailScreen
 import com.example.unimarketfrontend.ui.screens.ManageProductsScreen
 import com.example.unimarketfrontend.ui.screens.ProfileScreen
+import com.example.unimarketfrontend.ui.screens.MessagesScreen
+
 
 @Composable
 fun AppNavigation() {

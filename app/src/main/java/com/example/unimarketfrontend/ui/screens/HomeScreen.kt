@@ -57,6 +57,8 @@ import com.example.unimarketfrontend.ui.theme.TextSecondary
 import com.example.unimarketfrontend.viewmodel.HomeUiState
 import com.example.unimarketfrontend.viewmodel.HomeViewModel
 
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavController,
