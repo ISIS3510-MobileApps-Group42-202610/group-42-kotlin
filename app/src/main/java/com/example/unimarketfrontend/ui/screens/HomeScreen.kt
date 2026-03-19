@@ -19,10 +19,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -104,6 +107,18 @@ fun HomeScreen(
                         currentRoute = "home",
                         onRouteChange = { route -> navController.navigate(route) }
                     )
+                },
+                floatingActionButton = {
+                    FloatingActionButton(
+                        onClick = { navController.navigate("createListing") },
+                        containerColor = PrimaryIndigo,
+                        contentColor = Color.White
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Anadir producto"
+                        )
+                    }
                 },
                 containerColor = BackgroundLight
             ) { innerPadding ->

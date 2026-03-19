@@ -3,7 +3,7 @@ package com.example.unimarketfrontend.viewmodel
 import androidx.lifecycle.ViewModel
 import com.example.unimarketfrontend.analytics.BusinessAnalyticsProvider
 
-class MessagesViewModel(
+class MessageAnalyticsViewModel(
     private val listingId: Int,
     private val sellerId: Int
 ) : ViewModel() {
@@ -24,4 +24,3 @@ class MessagesViewModel(
         )
     }
 }
-
