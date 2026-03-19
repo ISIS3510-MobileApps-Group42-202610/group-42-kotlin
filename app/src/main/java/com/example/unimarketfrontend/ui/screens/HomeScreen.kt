@@ -51,6 +51,7 @@ import coil.compose.AsyncImage
 import com.example.unimarketfrontend.network.model.Listing
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import com.example.unimarketfrontend.ui.navigation.createListingNavigationHandler
+import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.ui.theme.AccentOrange
 import com.example.unimarketfrontend.ui.theme.BackgroundLight
 import com.example.unimarketfrontend.ui.theme.PrimaryIndigo
@@ -105,12 +106,12 @@ fun HomeScreen(
                 bottomBar = {
                     BottomNavigationBar(
                         currentRoute = "home",
-                        onRouteChange = { route -> navController.navigate(route) }
+                        onRouteChange = { route -> navController.navigateTracked(route) }
                     )
                 },
                 floatingActionButton = {
                     FloatingActionButton(
-                        onClick = { navController.navigate("createListing") },
+                        onClick = { navController.navigateTracked("createListing") },
                         containerColor = PrimaryIndigo,
                         contentColor = Color.White
                     ) {

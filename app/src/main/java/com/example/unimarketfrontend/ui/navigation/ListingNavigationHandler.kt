@@ -17,7 +17,10 @@ class ListingNavigationHandlerImpl(
 ) : ListingNavigationHandler {
 
     override fun navigateToListing(listingId: Int) {
-        navController.navigate(ListingRoutesFactory.detailPath(listingId))
+        navController.navigateTracked(
+            targetRoute = ListingRoutesFactory.detailPath(listingId),
+            destinationKey = ListingRoutesFactory.DETAIL_ROUTE
+        )
     }
 
     override fun navigateBack() {
