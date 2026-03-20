@@ -1,3 +1,4 @@
+
 package com.example.unimarketfrontend.analytics
 
 
@@ -22,4 +23,7 @@ enum class AnalyticsAuthMode {
     Bearer,
     ApiKey
 }
+
+
+
 
