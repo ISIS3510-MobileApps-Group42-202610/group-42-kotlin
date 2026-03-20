@@ -15,7 +15,9 @@ sealed class HomeUiState {
     data class Success(
         val userName: String,
         val listings: List<Listing>,
-        val categories: List<Category>
+        val categories: List<Category>,
+        val trending: List<Listing>,
+        val recent: List<Listing>
     ) : HomeUiState()
     data class Error(val message: String) : HomeUiState()
 }
@@ -51,7 +53,23 @@ class HomeViewModel : ViewModel() {
                     userName = user.name ?: "Student",
                     listings = ranking.trending,
                     categories = categories
+                  /*
+                val homeResponse = RetrofitInstance.api.getHomeRanking()
+
+                val categoriesUi = homeResponse.categories.map { categoryDto ->
+                    CategoryUi(
+                        name = categoryDto.category,
+                        count = categoryDto.count
+                    )
+                }
+
+                _uiState.value = HomeUiState.Success(
+                    userName = user.name,
+                    trending = homeResponse.trending,
+                    recent = homeResponse.recent,
+                    categories = categoriesUi*/
                 )
+
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(e.message ?: "Unknown error")
             }

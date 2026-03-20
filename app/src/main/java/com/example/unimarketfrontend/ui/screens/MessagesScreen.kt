@@ -18,6 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.unimarketfrontend.network.model.ConversationPreview
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
+import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.viewmodel.MessagesUiState
 import com.example.unimarketfrontend.viewmodel.MessagesViewModel
 
@@ -40,7 +41,7 @@ fun MessagesScreen(
             BottomNavigationBar(
                 currentRoute = "messages",
                 onRouteChange = { route ->
-                    navController.navigate(route) {
+                    navController.navigateTracked(route) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }

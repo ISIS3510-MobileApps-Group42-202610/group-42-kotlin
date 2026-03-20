@@ -1,10 +1,10 @@
 package com.example.unimarketfrontend.ui.components
 
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,56 +15,42 @@ import coil.compose.AsyncImage
 import com.example.unimarketfrontend.network.model.Listing
 
 @Composable
-fun TrendingCard(
-    imageUrl: String,
-    title: String,
-    price: String,
-    condition: String,
-    onClick: () -> Unit = {}
-) {
-
+fun RecentlyAddedCard(listing: Listing, onClick: () -> Unit = {}) {
     Card(
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(8.dp),
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier
-            .width(180.dp)
-            .padding(end = 12.dp)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable { onClick() }
     ) {
-
-        Column {
+        Row(
+            modifier = Modifier.padding(16.dp)
+        ) {
 
             AsyncImage(
-                model = imageUrl,
+                model = listing.images?.firstOrNull()?.url ?: "",
                 contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(140.dp),
+                modifier = Modifier.size(80.dp),
                 contentScale = ContentScale.Crop
             )
 
-            Column(modifier = Modifier.padding(12.dp)) {
+            Spacer(modifier = Modifier.width(16.dp))
 
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
-                    text = condition,
-                    style = MaterialTheme.typography.bodySmall
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = title,
+                    text = listing.title,
                     style = MaterialTheme.typography.titleMedium
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = price,
-                    style = MaterialTheme.typography.titleSmall
+                    text = "$${listing.selling_price}",
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
         }
     }
 }
-
