@@ -7,7 +7,7 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import com.example.unimarketfrontend.network.model.User
-import com.example.unimarketfrontend.network.model.Message
+import retrofit2.http.DELETE
 
 
 interface ApiService {
@@ -29,6 +29,27 @@ interface ApiService {
 
     @GET("api/v1/users/me")
     suspend fun getMe(): User
+
+    @GET("api/v1/users/me/wishlist")
+    suspend fun getWishlist(): List<Listing>
+
+    @GET("api/v1/users/me/purchases")
+    suspend fun getPurchases(): UserWithPurchases
+
+    @GET("api/v1/users/me/following")
+    suspend fun getFollowing(): List<User>
+
+    @DELETE("api/v1/users/me/wishlist/{listingId}")
+    suspend fun removeFromWishlist(@Path("listingId") listingId: Int)
+
+    @POST("api/v1/auth/register")
+    suspend fun register(@Body request: RegisterRequest)
+
+    @POST("api/v1/auth/forgot-password")
+    suspend fun forgotPassword(@Body request: ForgotPasswordRequest)
+
+    @POST("api/v1/auth/reset-password")
+    suspend fun resetPassword(@Body request: ResetPasswordRequest)
 
     @GET("api/v1/listings/home/ranking")
     suspend fun getHomeRanking(): HomeResponseDto
