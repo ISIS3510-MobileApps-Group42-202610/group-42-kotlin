@@ -1,5 +1,7 @@
 package com.example.unimarketfrontend.viewmodel
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.network.RetrofitInstance
@@ -24,6 +26,7 @@ data class CategoryUi(
     val count: Int
 )
 
+@RequiresApi(Build.VERSION_CODES.O)
 class HomeViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -33,6 +36,7 @@ class HomeViewModel : ViewModel() {
         loadHome()
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun loadHome() {
         viewModelScope.launch {
             try {

@@ -79,6 +79,9 @@ interface ApiService {
     suspend fun getAverageByListing(
         @Path("listingId") listingId: Int
     ): Response<Map<String, Any?>>
+
+    @DELETE("api/v1/users/{id}")
+    suspend fun deleteAccount(@Path("id") userId: Int)
 }
 // TODO: Revisar cómo funciona el bsackend y conectar
 // @GET("api/v1/messages/as-buyer")

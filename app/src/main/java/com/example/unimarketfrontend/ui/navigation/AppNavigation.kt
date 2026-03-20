@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.unimarketfrontend.analytics.PerformanceTrackerProvider
+import com.example.unimarketfrontend.network.RetrofitInstance
 import com.example.unimarketfrontend.ui.screens.CreateListingScreen
 import com.example.unimarketfrontend.ui.screens.ForgotPasswordScreen
 import com.example.unimarketfrontend.ui.screens.HomeScreen
@@ -21,7 +22,7 @@ import com.example.unimarketfrontend.ui.screens.RegisterScreen
 
 @Composable
 fun AppNavigation() {
-    var isLoggedIn by remember { mutableStateOf(false) }
+    var isLoggedIn by remember { mutableStateOf(RetrofitInstance.isLoggedIn()) }
 
     if (!isLoggedIn) {
         val authNavController = rememberNavController()
@@ -53,7 +54,12 @@ fun AppNavigation() {
 
         NavHost(navController = navController, startDestination = "home") {
             composable("home") { HomeScreen(navController) }
-            composable("profile") { ProfileScreen(navController) }
+            composable("profile") {
+                ProfileScreen(
+                    navController = navController,
+                    onLogout = { isLoggedIn = false }
+                )
+            }
             composable("manage") { ManageProductsScreen(navController) }
             composable("messages") { MessagesScreen(navController) }
             composable("createListing") { CreateListingScreen(navController) }

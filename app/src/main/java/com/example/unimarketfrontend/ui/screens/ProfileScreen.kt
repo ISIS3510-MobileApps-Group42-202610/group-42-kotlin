@@ -1,6 +1,8 @@
 package com.example.unimarketfrontend.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,8 +38,10 @@ private val TextGray  = Color(0xFF888888)
 private enum class ProfileTab { WISHLIST, PURCHASES, FOLLOWING }
 
 @Composable
-fun ProfileScreen(navController: NavController) {
-
+fun ProfileScreen(
+    navController: NavController,
+    onLogout: () -> Unit = {}
+) {
     val viewModel: ProfileViewModel = viewModel()
 
     val user      by viewModel.user.collectAsState()
@@ -47,7 +51,33 @@ fun ProfileScreen(navController: NavController) {
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMsg  by viewModel.errorMsg.collectAsState()
 
-    var selectedTab by remember { mutableStateOf(ProfileTab.PURCHASES) }
+    var selectedTab        by remember { mutableStateOf(ProfileTab.PURCHASES) }
+    var showDeleteDialog   by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            containerColor = CardColor,
+            title = { Text("Delete account", color = Color.White, fontWeight = FontWeight.Bold) },
+            text  = { Text("Are you sure? This action cannot be undone.", color = TextGray) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.deleteAccount(
+                        onSuccess = { onLogout() },
+                        onError   = {  }
+                    )
+                }) {
+                    Text("Delete", color = Color.Red, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel", color = TextGray)
+                }
+            }
+        )
+    }
 
     Scaffold(
         containerColor = BgColor,
@@ -220,7 +250,34 @@ fun ProfileScreen(navController: NavController) {
                 }
             }
 
-            item { Spacer(Modifier.height(8.dp)) }
+            item {
+                Spacer(Modifier.height(8.dp))
+                val interactionSource = remember { MutableInteractionSource() }
+                val isHovered by interactionSource.collectIsHoveredAsState()
+                Button(
+                    onClick = { showDeleteDialog = true },
+                    interactionSource = interactionSource,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isHovered) Color.Red else Color(0xFF3A1A1A)
+                    )
+                ) {
+                    Text("Delete account", color = Color.Red, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            item {
+                Button(
+                    onClick = { viewModel.logout(onSuccess = { onLogout() }) },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A3A3A))
+                ) {
+                    Text("Sign out", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
     }
 }

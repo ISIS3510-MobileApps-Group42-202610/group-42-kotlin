@@ -19,7 +19,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             UniMarketFrontendTheme {
-                UniMarketApp(startupStartElapsedMs = startupStartElapsedMs)
+                UniMarketApp(
+                    startupStartElapsedMs = startupStartElapsedMs,
+                    context = applicationContext
+                )
             }
         }
     }
