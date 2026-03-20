@@ -14,13 +14,12 @@ class LoginViewModel : ViewModel() {
         email: String,
         password: String,
         onSuccess: () -> Unit,
-        onError: () -> Unit
+        onError: (String) -> Unit
     ) {
         viewModelScope.launch {
             try {
-                val response = RetrofitInstance.api.login(
-                    LoginRequest(email, password)
-                )
+                val response = RetrofitInstance.api.login(LoginRequest(email, password))
+                // Store the JWT token in the Retrofit interceptor
                 RetrofitInstance.setToken(response.access_token)
 
                 AnalyticsConfig.authMode = AnalyticsAuthMode.Bearer
@@ -28,7 +27,7 @@ class LoginViewModel : ViewModel() {
 
                 onSuccess()
             } catch (e: Exception) {
-                onError()
+                onError(e.message ?: "Login failed")
             }
         }
     }

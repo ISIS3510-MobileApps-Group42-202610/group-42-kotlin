@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.unimarketfrontend.ui.screens.ChatScreen
 import com.example.unimarketfrontend.analytics.PerformanceTrackerProvider
 import com.example.unimarketfrontend.ui.screens.CreateListingScreen
 import com.example.unimarketfrontend.ui.screens.ForgotPasswordScreen
@@ -45,6 +46,18 @@ fun AppNavigation() {
                     onNavigateToLogin = { authNavController.navigate("login") }
                 )
             }
+            
+            composable(
+            route = "chat/{sellerId}/{sellerName}",
+            arguments = listOf(
+                navArgument("sellerId") { type = NavType.IntType },
+                navArgument("sellerName") { type = NavType.StringType }
+            )
+            
+        ) { entry ->
+            val sellerId = entry.arguments?.getInt("sellerId") ?: 0
+            val sellerName = entry.arguments?.getString("sellerName") ?: "Seller"
+            ChatScreen(navController, sellerId, sellerName)
         }
 
     } else {
