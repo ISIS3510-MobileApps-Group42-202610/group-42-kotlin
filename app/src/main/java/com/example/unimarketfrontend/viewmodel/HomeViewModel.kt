@@ -2,9 +2,7 @@ package com.example.unimarketfrontend.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.analytics.AnalyticsLogger
 import com.example.unimarketfrontend.network.RetrofitInstance
-import com.example.unimarketfrontend.network.model.Category
 import com.example.unimarketfrontend.network.model.Listing
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,13 +12,17 @@ sealed class HomeUiState {
     object Loading : HomeUiState()
     data class Success(
         val userName: String,
-        val listings: List<Listing>,
-        val categories: List<Category>,
         val trending: List<Listing>,
-        val recent: List<Listing>
+        val recent: List<Listing>,
+        val categories: List<CategoryUi>
     ) : HomeUiState()
     data class Error(val message: String) : HomeUiState()
 }
+
+data class CategoryUi(
+    val name: String,
+    val count: Int
+)
 
 class HomeViewModel : ViewModel() {
 
@@ -35,25 +37,6 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val user = RetrofitInstance.api.getMe()
-                val ranking = RetrofitInstance.api.getHomeRanking()
-
-                // Map the category counts map to a list of Category objects
-                val categories = ranking.categories.map { (name, count) ->
-                    Category(
-                        name = name.replaceFirstChar { it.uppercase() },
-                        count = count
-                    )
-                }
-
-                // Register user ID for analytics events
-                AnalyticsLogger.setUserId(user.id ?: 0)
-                AnalyticsLogger.log("home_screen_opened")
-
-                _uiState.value = HomeUiState.Success(
-                    userName = user.name ?: "Student",
-                    listings = ranking.trending,
-                    categories = categories
-                  /*
                 val homeResponse = RetrofitInstance.api.getHomeRanking()
 
                 val categoriesUi = homeResponse.categories.map { categoryDto ->
@@ -67,10 +50,11 @@ class HomeViewModel : ViewModel() {
                     userName = user.name,
                     trending = homeResponse.trending,
                     recent = homeResponse.recent,
-                    categories = categoriesUi*/
+                    categories = categoriesUi
                 )
 
             } catch (e: Exception) {
+                e.printStackTrace()
                 _uiState.value = HomeUiState.Error(e.message ?: "Unknown error")
             }
         }
