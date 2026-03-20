@@ -24,6 +24,12 @@ sealed class CreateListingState {
     data class Error(val message: String) : CreateListingState()
 }
 
+data class SmartSuggestion(
+    val category: String,
+    val price: Double,
+    val description: String
+)
+
 class CreateListingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _state =
@@ -131,5 +137,50 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         }
 
         return uploadedUrls
+    }
+
+    fun suggestFromText(title: String): SmartSuggestion {
+        val lower = title.lowercase()
+
+        return when {
+            lower.contains("calculator") || lower.contains("ti-84") -> {
+                SmartSuggestion(
+                    category = "Electronics",
+                    price = 50000.0,
+                    description = "Scientific calculator in good condition"
+                )
+            }
+
+            lower.contains("book") || lower.contains("calculus") -> {
+                SmartSuggestion(
+                    category = "Books",
+                    price = 30000.0,
+                    description = "Academic textbook used for courses"
+                )
+            }
+
+            lower.contains("notes") -> {
+                SmartSuggestion(
+                    category = "Notes",
+                    price = 10000.0,
+                    description = "Well-organized study notes"
+                )
+            }
+
+            lower.contains("furniture") -> {
+                SmartSuggestion(
+                    category = "Furniture",
+                    price = 100000.0,
+                    description = "Comfortable and spacious furniture"
+                )
+            }
+            else -> {
+                SmartSuggestion(
+                    category = "Other",
+                    price = 20000.0,
+                    description = "Good condition item for university use."
+                )
+            }
+        }
     }
 }

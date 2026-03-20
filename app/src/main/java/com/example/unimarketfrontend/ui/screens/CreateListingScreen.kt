@@ -89,6 +89,9 @@ fun CreateListingScreen(
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
+    var isAutoDescription by remember { mutableStateOf(true) }
+    var isAutoPrice by remember { mutableStateOf(true) }
+    var isAutoCategory by remember { mutableStateOf(true) }
     var localError by remember { mutableStateOf<String?>(null) }
     var selectedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -190,6 +193,27 @@ fun CreateListingScreen(
                 onValueChange = {
                     title = it
                     localError = null
+
+                    if (it.isBlank()) {
+                        isAutoDescription = true
+                        isAutoPrice = true
+                        isAutoCategory = true
+                    } else if (it.length >= 3) {
+
+                        val suggestion = viewModel.suggestFromText(it)
+
+                        if (isAutoDescription) {
+                            description = suggestion.description
+                        }
+
+                        if (isAutoPrice) {
+                            price = suggestion.price.toString()
+                        }
+
+                        if (isAutoCategory) {
+                            selectedCategory = suggestion.category
+                        }
+                    }
                 },
                 label = "Title",
                 modifier = Modifier.fillMaxWidth(),
@@ -200,7 +224,10 @@ fun CreateListingScreen(
 
             NeumorphicTextField(
                 value = description,
-                onValueChange = { description = it },
+                onValueChange = {
+                    description = it
+                    isAutoDescription = false
+                },
                 label = "Description",
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = {
@@ -213,6 +240,7 @@ fun CreateListingScreen(
                 onValueChange = {
                     price = it
                     localError = null
+                    isAutoPrice = false
                 },
                 label = "Price",
                 modifier = Modifier.fillMaxWidth(),
@@ -227,7 +255,7 @@ fun CreateListingScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("Books", "Notes", "Electronics", "Furniture").forEach { category ->
+                listOf("Books", "Notes", "Electronics", "Furniture", "Other").forEach { category ->
                     Box(
                         modifier = Modifier
                             .height(40.dp)
