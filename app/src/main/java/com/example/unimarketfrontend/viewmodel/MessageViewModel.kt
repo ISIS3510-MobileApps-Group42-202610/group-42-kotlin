@@ -26,9 +26,8 @@ class MessagesViewModel : ViewModel() {
 
     // Estado de solo lectura que la pantalla observa
     val uiState: StateFlow<MessagesUiState> = _uiState
-
+    // Se ejecuta automáticamente cuando se crea el ViewModel
     init {
-        // Se ejecuta automáticamente cuando se crea el ViewModel
         loadConversations()
     }
 
