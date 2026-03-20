@@ -54,7 +54,7 @@ fun ProfileScreen(navController: NavController) {
             BottomNavigationBar(
                 currentRoute = "profile",
                 onRouteChange = { route ->
-                    navController.navigate(route) {
+                    navController.navigateTracked(route) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }

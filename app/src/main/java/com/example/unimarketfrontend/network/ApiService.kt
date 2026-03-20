@@ -6,13 +6,18 @@ import com.example.unimarketfrontend.network.model.Listing
 import com.example.unimarketfrontend.network.model.Purchase
 import com.example.unimarketfrontend.network.model.RegisterRequest
 import com.example.unimarketfrontend.network.model.ResetPasswordRequest
+
+import com.example.unimarketfrontend.network.model.*
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 import com.example.unimarketfrontend.network.model.User
 import com.example.unimarketfrontend.network.model.UserWithPurchases
 import retrofit2.http.DELETE
 import retrofit2.http.Path
+import com.example.unimarketfrontend.network.model.Message
 
 
 interface ApiService {
@@ -37,7 +42,15 @@ interface ApiService {
     )
 
     @GET("api/v1/listings")
-    suspend fun getListings(): List<Listing>
+    suspend fun getListings(): Response<List<Listing>>
+
+    @GET("api/v1/listings/my")
+    suspend fun getMyListings(): Response<MyListingsResponse>
+
+    @POST("api/v1/listings")
+    suspend fun createListing(
+        @Body request: CreateListingRequest
+    ): Response<Listing>
 
     @GET("api/v1/users/me")
     suspend fun getMe(): User
@@ -54,4 +67,40 @@ interface ApiService {
     @DELETE("api/v1/users/me/wishlist/{listingId}")
     suspend fun removeFromWishlist(@Path("listingId") listingId: Int)
 
+    @GET("api/v1/listings/home/ranking")
+    suspend fun getHomeRanking(): HomeResponseDto
+
+    @POST("api/v1/uploads/cloudinary-signature")
+    suspend fun getCloudinarySignature(
+        @Body request: CloudinarySignatureRequest
+    ): Response<CloudinarySignatureResponse>
+
+    @POST("api/v1/listings/{id}/images")
+    suspend fun addListingImage(
+        @Path("id") listingId: Int,
+        @Body request: AddImageRequest
+    ): Response<ListingImage>
+
+    @GET("api/v1/users/{id}")
+    suspend fun getUserById(
+        @Path("id") userId: Int
+    ): Response<User>
+
+    @GET("api/v1/reviews/listing/{listingId}")
+    suspend fun getReviewsByListing(
+        @Path("listingId") listingId: Int
+    ): Response<List<Review>>
+
+    @GET("api/v1/reviews/listing/{listingId}/average")
+    suspend fun getAverageByListing(
+        @Path("listingId") listingId: Int
+    ): Response<Map<String, Any?>>
 }
+// TODO: Revisar cómo funciona el bsackend y conectar
+// @GET("api/v1/messages/as-buyer")
+// suspend fun getMessagesAsBuyer(): List<Message>
+//}
+//    @POST("api/v1/messages")
+//    suspend fun sendMessage(
+//        @Body request: MessageRequest
+//    ): MessageResponse

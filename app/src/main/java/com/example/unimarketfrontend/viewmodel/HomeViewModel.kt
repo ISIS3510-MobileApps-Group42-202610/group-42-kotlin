@@ -1,4 +1,5 @@
 package com.example.unimarketfrontend.viewmodel
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.network.RetrofitInstance
@@ -11,7 +12,8 @@ sealed class HomeUiState {
     object Loading : HomeUiState()
     data class Success(
         val userName: String,
-        val listings: List<Listing>,
+        val trending: List<Listing>,
+        val recent: List<Listing>,
         val categories: List<CategoryUi>
     ) : HomeUiState()
     data class Error(val message: String) : HomeUiState()
@@ -30,26 +32,30 @@ class HomeViewModel : ViewModel() {
     init {
         loadHome()
     }
+
     private fun loadHome() {
-        //Si falla el lanzamiento devuelve error, se carga user listings, categorias.
         viewModelScope.launch {
             try {
                 val user = RetrofitInstance.api.getMe()
-                val listings = RetrofitInstance.api.getListings()
+                val homeResponse = RetrofitInstance.api.getHomeRanking()
 
-                val categories = listings
-                    .groupBy { it.category ?: "Other"}
-                    .map { entry ->
-                        CategoryUi(
-                            name = entry.key, count = entry.value.size) }
+                val categoriesUi = homeResponse.categories.map { categoryDto ->
+                    CategoryUi(
+                        name = categoryDto.category,
+                        count = categoryDto.count
+                    )
+                }
 
                 _uiState.value = HomeUiState.Success(
                     userName = user.name,
-                    listings = listings.take(15),
-                    categories = categories
+                    trending = homeResponse.trending,
+                    recent = homeResponse.recent,
+                    categories = categoriesUi
                 )
+
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error("Failed to load home")
+                e.printStackTrace()
+                _uiState.value = HomeUiState.Error(e.message ?: "Unknown error")
             }
         }
     }
