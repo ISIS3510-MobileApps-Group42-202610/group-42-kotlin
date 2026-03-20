@@ -178,7 +178,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 SmartSuggestion(
                     category = "Other",
                     price = 20000.0,
-                    description = "Good condition item for university use"
+                    description = "Good condition item for university use."
                 )
             }
         }
