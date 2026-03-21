@@ -1,4 +1,3 @@
-
 package com.example.unimarketfrontend.ui.navigation
 
 import androidx.compose.runtime.*
@@ -9,9 +8,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.unimarketfrontend.ui.screens.ChatScreen
 import com.example.unimarketfrontend.analytics.PerformanceTrackerProvider
 import com.example.unimarketfrontend.network.RetrofitInstance
+import com.example.unimarketfrontend.ui.screens.ChatScreen
 import com.example.unimarketfrontend.ui.screens.CreateListingScreen
 import com.example.unimarketfrontend.ui.screens.ForgotPasswordScreen
 import com.example.unimarketfrontend.ui.screens.HomeScreen
@@ -21,6 +20,7 @@ import com.example.unimarketfrontend.ui.screens.ManageProductsScreen
 import com.example.unimarketfrontend.ui.screens.MessagesScreen
 import com.example.unimarketfrontend.ui.screens.ProfileScreen
 import com.example.unimarketfrontend.ui.screens.RegisterScreen
+import com.example.unimarketfrontend.ui.screens.SearchScreen
 
 @Composable
 fun AppNavigation() {
@@ -64,6 +64,7 @@ fun AppNavigation() {
             }
             composable("manage") { ManageProductsScreen(navController) }
             composable("messages") { MessagesScreen(navController) }
+            composable("search") { SearchScreen(navController) }
             composable("createListing") { CreateListingScreen(navController) }
             composable(
                 route = ListingRoutesFactory.DETAIL_ROUTE,
@@ -71,6 +72,20 @@ fun AppNavigation() {
             ) { backStackEntry ->
                 val listingId = backStackEntry.arguments?.getInt("listingId") ?: -1
                 ListingDetailScreen(navController = navController, listingId = listingId)
+            }
+            composable(
+                route = "chat/{sellerId}/{sellerName}",
+                arguments = listOf(
+                    navArgument("sellerId") { type = NavType.IntType },
+                    navArgument("sellerName") { type = NavType.StringType }
+                )
+            ) { entry ->
+                val sellerId = entry.arguments?.getInt("sellerId") ?: 0
+                val sellerName = java.net.URLDecoder.decode(
+                    entry.arguments?.getString("sellerName") ?: "Seller",
+                    "UTF-8"
+                )
+                ChatScreen(navController, sellerId, sellerName)
             }
         }
     }

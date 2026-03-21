@@ -1,3 +1,4 @@
+
 package com.example.unimarketfrontend.network
 
 import com.example.unimarketfrontend.network.model.*
@@ -24,9 +25,8 @@ interface ApiService {
     @POST("api/v1/auth/reset-password")
     suspend fun resetPassword(@Body request: ResetPasswordRequest)
 
-    @DELETE("api/v1/auth/account")
-    suspend fun deleteAccount(@Body request: Int)
-
+    @DELETE("api/v1/users/{id}")
+    suspend fun deleteAccount(@Path("id") userId: Int)
     // Users
     @GET("api/v1/users/me")
     suspend fun getMe(): User
