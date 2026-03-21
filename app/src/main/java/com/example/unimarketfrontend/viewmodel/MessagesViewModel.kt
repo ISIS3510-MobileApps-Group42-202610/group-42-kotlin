@@ -35,7 +35,6 @@ class MessagesViewModel : ViewModel() {
                     .mapNotNull { (_, msgs) ->
                         val last = msgs.maxByOrNull { it.created_at ?: "" }
                             ?: return@mapNotNull null
-                        // seller es SellerInfo, y el nombre real está en seller.user
                         val sellerUser = last.seller?.user
                         ConversationPreview(
                             otherPersonId = last.seller?.id ?: 0,

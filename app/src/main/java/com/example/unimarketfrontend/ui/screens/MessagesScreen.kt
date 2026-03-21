@@ -7,11 +7,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,7 +32,9 @@ fun MessagesScreen(
     viewModel: MessagesViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-
+    LaunchedEffect(Unit) {
+        viewModel.loadConversations()
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -111,7 +115,9 @@ fun MessagesScreen(
                                     conversation = conversation,
                                     onClick = {
                                         navController.navigate(
-                                            "chat/${conversation.otherPersonId}/${conversation.otherPersonName}"
+                                            "chat/${conversation.otherPersonId}/${
+                                                java.net.URLEncoder.encode(conversation.otherPersonName, "UTF-8")
+                                            }"
                                         )
                                     }
                                 )
