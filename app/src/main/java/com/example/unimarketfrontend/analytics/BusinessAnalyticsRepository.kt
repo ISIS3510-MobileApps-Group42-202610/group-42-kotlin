@@ -154,8 +154,17 @@ class BusinessAnalyticsTracker(
     }
 
     private fun buildClientEventId(eventName: String, listingId: Int?): String {
+        val eventPart = eventName
+            .lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9]+"), "-")
+            .trim('-')
+            .take(20)
+            .ifBlank { "evt" }
+
         val listingPart = listingId?.toString() ?: "na"
-        return "android-$eventName-$listingPart-${UUID.randomUUID()}"
+        val randomPart = UUID.randomUUID().toString().replace("-", "").takeLast(12)
+
+        return "an-$eventPart-$listingPart-$randomPart".take(64)
     }
 }
 
