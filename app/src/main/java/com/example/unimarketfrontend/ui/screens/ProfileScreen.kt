@@ -31,9 +31,9 @@ import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.viewmodel.ProfileViewModel
 
 private val Primary   = Color(0xFF7B8FE8)
-private val BgColor   = Color(0xFF121212)
-private val CardColor = Color(0xFF1E1E1E)
-private val TextGray  = Color(0xFF888888)
+private val BgColor   = Color(0xFFFFFFFF)
+private val CardColor = Color(0xFFF5F5F5)
+private val TextGray  = Color(0xFFC4C4C4)
 
 private enum class ProfileTab { WISHLIST, PURCHASES, FOLLOWING }
 
@@ -58,7 +58,7 @@ fun ProfileScreen(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             containerColor = CardColor,
-            title = { Text("Delete account", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Delete account", color = Color.Black, fontWeight = FontWeight.Bold) },
             text  = { Text("Are you sure? This action cannot be undone.", color = TextGray) },
             confirmButton = {
                 TextButton(onClick = {
@@ -68,7 +68,7 @@ fun ProfileScreen(
                         onError   = {  }
                     )
                 }) {
-                    Text("Delete", color = Color.Red, fontWeight = FontWeight.Bold)
+                    Text("Delete", color = Color(0xFFB00505), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -116,7 +116,7 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("My Profile", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("My Profile", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     IconButton(onClick = {}) {
                         Icon(Icons.Default.Person, contentDescription = "Settings", tint = TextGray)
                     }
@@ -152,13 +152,13 @@ fun ProfileScreen(
                                     text = if (user != null) "${user!!.name} ${user!!.last_name}" else "...",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Color.White
+                                    color = Color.Black
                                 )
                                 Text(user?.email ?: "", fontSize = 13.sp, color = TextGray)
                             }
                         }
 
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFF2E2E2E))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFE0E0E0))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -180,7 +180,7 @@ fun ProfileScreen(
                         shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.buttonColors(containerColor = Primary)
                     ) {
-                        Text("Switch to Seller Mode", fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text("Switch to Seller Mode", fontWeight = FontWeight.SemiBold, color = Color.Black)
                     }
                 }
             }
@@ -260,10 +260,10 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isHovered) Color.Red else Color(0xFF3A1A1A)
+                        containerColor = if (isHovered) Color.Red else Color(0xFFF10000)
                     )
                 ) {
-                    Text("Delete account", color = Color.Red, fontWeight = FontWeight.SemiBold)
+                    Text("Delete account", color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -272,9 +272,9 @@ fun ProfileScreen(
                     onClick = { viewModel.logout(onSuccess = { onLogout() }) },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A3A3A))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0E0E0))
                 ) {
-                    Text("Sign out", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Sign out", color = Color.Black, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -285,7 +285,7 @@ fun ProfileScreen(
 @Composable
 private fun StatItem(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
         Text(label, fontSize = 12.sp, color = TextGray)
     }
 }
@@ -298,8 +298,8 @@ private fun TabChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bg      = if (selected) Color.White else CardColor
-    val content = if (selected) Color(0xFF1A1A1A) else TextGray
+    val bg      = if (selected) Primary else CardColor
+    val content = if (selected) Color.White else Color.Black
 
     Surface(
         onClick = onClick,
@@ -341,7 +341,7 @@ private fun WishlistItem(listing: Listing, onRemove: () -> Unit) {
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(listing.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.White)
+                Text(listing.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
                 Text("$${listing.selling_price}", color = Primary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
             TextButton(onClick = onRemove) {
@@ -373,7 +373,7 @@ private fun PurchaseItem(purchase: Purchase) {
             Column(Modifier.weight(1f)) {
                 Text(
                     purchase.listing?.title ?: "Item deleted!",
-                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.White
+                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black
                 )
                 purchase.listing?.let {
                     Text("$${it.selling_price}", color = Primary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -416,7 +416,7 @@ private fun FollowingItem(user: User) {
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("${user.name} ${user.last_name}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.White)
+                Text("${user.name} ${user.last_name}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
                 Text(user.email, fontSize = 12.sp, color = TextGray)
             }
         }
