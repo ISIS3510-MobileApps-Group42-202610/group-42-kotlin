@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.play.services.location)
     debugImplementation(libs.androidx.ui.tooling)
     implementation(libs.retrofit)
     implementation(libs.converter.gson)

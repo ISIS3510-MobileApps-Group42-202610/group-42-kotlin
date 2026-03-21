@@ -1,3 +1,4 @@
+
 package com.example.unimarketfrontend.analytics
 
 import okhttp3.OkHttpClient
@@ -20,4 +21,5 @@ object AnalyticsRetrofitInstance {
             .create(AnalyticsApiService::class.java)
     }
 }
+
 

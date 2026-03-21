@@ -1,9 +1,11 @@
+
 package com.example.unimarketfrontend.network
 
 import com.example.unimarketfrontend.network.model.*
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import com.example.unimarketfrontend.network.model.User
@@ -11,11 +13,23 @@ import retrofit2.http.DELETE
 
 
 interface ApiService {
+
+    // Auth
     @POST("api/v1/auth/login")
     suspend fun login(
         @Body request: LoginRequest
     ): LoginResponse
 
+    @POST("api/v1/auth/register")
+    suspend fun register(@Body request: RegisterRequest)
+
+    @POST("api/v1/auth/forgot-password")
+    suspend fun forgotPassword(@Body request: ForgotPasswordRequest)
+
+    @POST("api/v1/auth/reset-password")
+    suspend fun resetPassword(@Body request: ResetPasswordRequest)
+
+    // Users
     @GET("api/v1/listings")
     suspend fun getListings(): Response<List<Listing>>
 
@@ -76,6 +90,8 @@ interface ApiService {
     ): Response<List<Review>>
 
     @GET("api/v1/reviews/listing/{listingId}/average")
+    suspend fun getAverageByListing(@Path("listingId") listingId: Int): Response<Map<String, Any?>>
+}
     suspend fun getAverageByListing(
         @Path("listingId") listingId: Int
     ): Response<Map<String, Any?>>

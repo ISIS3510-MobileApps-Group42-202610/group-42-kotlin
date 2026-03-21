@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -106,7 +107,14 @@ fun MessagesScreen(
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             items(conversations) { conversation ->
-                                ConversationRow(conversation = conversation)
+                                ConversationRow(
+                                    conversation = conversation,
+                                    onClick = {
+                                        navController.navigate(
+                                            "chat/${conversation.otherPersonId}/${conversation.otherPersonName}"
+                                        )
+                                    }
+                                )
                                 HorizontalDivider(
                                     modifier = Modifier.padding(start = 76.dp),
                                     color = MaterialTheme.colorScheme.outlineVariant
@@ -121,10 +129,11 @@ fun MessagesScreen(
 }
 
 @Composable
-fun ConversationRow(conversation: ConversationPreview) {
+fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
