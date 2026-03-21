@@ -69,4 +69,22 @@ class ProfileViewModel : ViewModel() {
             }
         }
     }
+
+    fun logout(onSuccess: () -> Unit) {
+        RetrofitInstance.clearToken()
+        onSuccess()
+    }
+
+    fun deleteAccount(onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val userId = _user.value?.id ?: return@launch
+                RetrofitInstance.api.deleteAccount(userId)
+                RetrofitInstance.clearToken()
+                onSuccess()
+            } catch (e: Exception) {
+                onError("Error al eliminar cuenta: ${e.message}")
+            }
+        }
+    }
 }

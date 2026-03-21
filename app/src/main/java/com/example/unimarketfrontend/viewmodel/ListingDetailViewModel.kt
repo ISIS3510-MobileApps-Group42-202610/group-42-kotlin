@@ -35,8 +35,8 @@ class ListingDetailViewModel(
     private val _uiState = MutableStateFlow<ListingDetailUiState>(ListingDetailUiState.Loading)
     val uiState: StateFlow<ListingDetailUiState> = _uiState
 
-    private var listingViewedTracked = false
-    private var chatStartedTracked = false
+    private var listingViewedTracked   = false
+    private var chatStartedTracked     = false
     private var firstMessageSentTracked = false
 
     init {
@@ -51,11 +51,11 @@ class ListingDetailViewModel(
                 if (!listingResponse.isSuccessful || listingResponse.body() == null) {
                     _uiState.value = ListingDetailUiState.Error("No se pudo cargar el listing")
                     BusinessAnalyticsProvider.tracker.trackPerformance(
-                        metricName = "listing_detail_load_time",
-                        valueMs = System.currentTimeMillis() - startMs,
-                        listingId = listingId,
-                        screenName = "ListingDetailScreen",
-                        metadata = mapOf("status" to "http_error")
+                        metricName  = "listing_detail_load_time",
+                        valueMs     = System.currentTimeMillis() - startMs,
+                        listingId   = listingId,
+                        screenName  = "ListingDetailScreen",
+                        metadata    = mapOf("status" to "http_error")
                     )
                     return@launch
                 }
@@ -64,41 +64,41 @@ class ListingDetailViewModel(
                 if (listing == null) {
                     _uiState.value = ListingDetailUiState.Error("Listing no encontrado")
                     BusinessAnalyticsProvider.tracker.trackPerformance(
-                        metricName = "listing_detail_load_time",
-                        valueMs = System.currentTimeMillis() - startMs,
-                        listingId = listingId,
-                        screenName = "ListingDetailScreen",
-                        metadata = mapOf("status" to "not_found")
+                        metricName  = "listing_detail_load_time",
+                        valueMs     = System.currentTimeMillis() - startMs,
+                        listingId   = listingId,
+                        screenName  = "ListingDetailScreen",
+                        metadata    = mapOf("status" to "not_found")
                     )
                     return@launch
                 }
 
-                val seller = loadSeller(listing.seller_id)
-                val reviews = loadReviews(listing.id)
+                val seller        = loadSeller(listing.seller_id)
+                val reviews       = loadReviews(listing.id)
                 val ratingSummary = loadAverageRating(listing.id, reviews)
 
                 _uiState.value = ListingDetailUiState.Success(
-                    listing = listing,
-                    seller = seller,
-                    reviews = reviews,
+                    listing       = listing,
+                    seller        = seller,
+                    reviews       = reviews,
                     ratingSummary = ratingSummary
                 )
                 trackListingViewed(listing)
                 BusinessAnalyticsProvider.tracker.trackPerformance(
-                    metricName = "listing_detail_load_time",
-                    valueMs = System.currentTimeMillis() - startMs,
-                    listingId = listing.id,
-                    screenName = "ListingDetailScreen",
-                    metadata = mapOf("status" to "success")
+                    metricName  = "listing_detail_load_time",
+                    valueMs     = System.currentTimeMillis() - startMs,
+                    listingId   = listing.id,
+                    screenName  = "ListingDetailScreen",
+                    metadata    = mapOf("status" to "success")
                 )
             } catch (e: Exception) {
                 _uiState.value = ListingDetailUiState.Error(e.message ?: "Error inesperado")
                 BusinessAnalyticsProvider.tracker.trackPerformance(
-                    metricName = "listing_detail_load_time",
-                    valueMs = System.currentTimeMillis() - startMs,
-                    listingId = listingId,
-                    screenName = "ListingDetailScreen",
-                    metadata = mapOf("status" to "exception")
+                    metricName  = "listing_detail_load_time",
+                    valueMs     = System.currentTimeMillis() - startMs,
+                    listingId   = listingId,
+                    screenName  = "ListingDetailScreen",
+                    metadata    = mapOf("status" to "exception")
                 )
             }
         }
@@ -125,30 +125,29 @@ class ListingDetailViewModel(
     private suspend fun loadAverageRating(listingId: Int, reviews: List<Review>): RatingSummaryUi {
         return try {
             val response = RetrofitInstance.api.getAverageByListing(listingId)
-            val body = if (response.isSuccessful) response.body().orEmpty() else emptyMap()
+            val body     = if (response.isSuccessful) response.body().orEmpty() else emptyMap()
             val averageFromApi = pickFirstNumber(body, listOf("average", "avg", "rating_average", "ratingAverage"))
-            val countFromApi = pickFirstNumber(body, listOf("count", "total", "total_reviews", "reviews_count"))?.toInt()
-
+            val countFromApi   = pickFirstNumber(body, listOf("count", "total", "total_reviews", "reviews_count"))?.toInt()
             val fallbackAverage = calculateAverageFromReviews(reviews)
             RatingSummaryUi(
                 average = averageFromApi ?: fallbackAverage,
-                count = countFromApi ?: reviews.size
+                count   = countFromApi   ?: reviews.size
             )
         } catch (_: Exception) {
             RatingSummaryUi(
                 average = calculateAverageFromReviews(reviews),
-                count = reviews.size
+                count   = reviews.size
             )
         }
     }
 
     private fun pickFirstNumber(source: Map<String, Any?>, keys: List<String>): Double? {
         for (key in keys) {
-            val value = source[key] ?: continue
+            val value   = source[key] ?: continue
             val numeric = when (value) {
                 is Number -> value.toDouble()
                 is String -> value.toDoubleOrNull()
-                else -> null
+                else      -> null
             }
             if (numeric != null) return numeric
         }
@@ -166,8 +165,8 @@ class ListingDetailViewModel(
         listingViewedTracked = true
         BusinessAnalyticsProvider.tracker.trackListingViewed(
             listingId = listing.id,
-            sellerId = listing.seller_id,
-            metadata = mapOf("source" to "listing_detail_screen")
+            sellerId  = listing.seller_id,
+            metadata  = mapOf("source" to "listing_detail_screen")
         )
     }
 
@@ -177,8 +176,8 @@ class ListingDetailViewModel(
         chatStartedTracked = true
         BusinessAnalyticsProvider.tracker.trackChatStarted(
             listingId = listing.id,
-            sellerId = listing.seller_id,
-            metadata = mapOf("entrypoint" to "contact_seller_button")
+            sellerId  = listing.seller_id,
+            metadata  = mapOf("entrypoint" to "contact_seller_button")
         )
     }
 
@@ -188,20 +187,29 @@ class ListingDetailViewModel(
         firstMessageSentTracked = true
         BusinessAnalyticsProvider.tracker.trackFirstMessageSent(
             listingId = listing.id,
-            sellerId = listing.seller_id,
-            metadata = mapOf(
-                "entrypoint" to "detail_screen",
+            sellerId  = listing.seller_id,
+            metadata  = mapOf(
+                "entrypoint"     to "detail_screen",
                 "message_length" to messageLength.toString()
             )
         )
     }
 
-    fun trackTransactionCompleted() {
-        val listing = (uiState.value as? ListingDetailUiState.Success)?.listing ?: return
+   fun trackTransactionCompleted() {
+        val state   = uiState.value as? ListingDetailUiState.Success ?: return
+        val listing = state.listing
+        val seller  = state.seller
+
         BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
             listingId = listing.id,
-            sellerId = listing.seller_id,
-            metadata = mapOf("entrypoint" to "detail_screen")
+            sellerId  = listing.seller_id,
+            metadata  = mapOf(
+                "entrypoint"    to "detail_screen",
+                "category"      to (listing.category ?: "unknown"),
+                "product"       to listing.product,
+                "selling_price" to listing.selling_price.toString(),
+                "semester"      to (seller?.semester?.toString() ?: "unknown")
+            )
         )
     }
 }
