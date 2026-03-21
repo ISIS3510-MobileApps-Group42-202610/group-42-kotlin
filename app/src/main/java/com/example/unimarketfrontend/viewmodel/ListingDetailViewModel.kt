@@ -7,6 +7,7 @@ import com.example.unimarketfrontend.analytics.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.network.RetrofitInstance
 import com.example.unimarketfrontend.network.model.Listing
 import com.example.unimarketfrontend.network.model.Review
+import com.example.unimarketfrontend.network.model.SendMessageRequest
 import com.example.unimarketfrontend.network.model.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -194,6 +195,20 @@ class ListingDetailViewModel(
             )
         )
     }
+    fun sendMessage(content: String, onSuccess: () -> Unit, onError: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val sellerId = (uiState.value as? ListingDetailUiState.Success)?.listing?.seller_id
+                    ?: return@launch
+                RetrofitInstance.api.sendMessageAsBuyer(
+                    SendMessageRequest(seller_id = sellerId, content = content)
+                )
+                onSuccess()
+            } catch (e: Exception) {
+                onError()
+            }
+        }
+    }
 
    fun trackTransactionCompleted() {
         val state   = uiState.value as? ListingDetailUiState.Success ?: return
@@ -225,3 +240,4 @@ class ListingDetailViewModelFactory(
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
+

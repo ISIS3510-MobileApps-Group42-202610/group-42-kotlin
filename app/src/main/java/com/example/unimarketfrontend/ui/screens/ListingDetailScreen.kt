@@ -129,8 +129,17 @@ fun ListingDetailScreen(
                             onClick = {
                                 if (messageText.isNotBlank()) {
                                     vm.trackFirstMessageSent(messageText.length)
-                                    messageText = ""
-                                    showMessageDialog = false
+                                    vm.sendMessage(
+                                        content = messageText,
+                                        onSuccess = {
+                                            messageText = ""
+                                            showMessageDialog = false
+                                        },
+                                        onError = {
+                                            messageText = ""
+                                            showMessageDialog = false
+                                        }
+                                    )
                                 }
                             }
                         ) { Text("Enviar") }
