@@ -39,19 +39,16 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             _isSending.value = true
             try {
-                val sent = RetrofitInstance.api.sendMessageAsBuyer(
+                val response = RetrofitInstance.api.sendMessageAsBuyer(
                     SendMessageRequest(seller_id = sellerId, content = content)
                 )
-                // Agrega el mensaje enviado al final de la lista existente
-                _messages.value = _messages.value + sent
-                AnalyticsLogger.log(
-                    "message_sent",
-                    mapOf("seller_id" to sellerId.toString())
-                )
+
+                _messages.value = _messages.value + response
+                AnalyticsLogger.log("message_sent", mapOf("seller_id" to sellerId.toString()))
+
             } catch (e: Exception) {
-                // Si falla el envío, el usuario puede intentar de nuevo
+                android.util.Log.e("CHAT_ERROR", "Error sending message: ${e.message}", e)
             } finally {
-                // finally se ejecuta siempre, haya error o no
                 _isSending.value = false
             }
         }
@@ -96,7 +93,6 @@ class ChatViewModel : ViewModel() {
         if (iso == null) return null
         return try {
             // ISO format: "2026-03-19T14:30:00.000Z"
-            // Parseamos manualmente para no depender de API 26
             val clean = iso.replace("Z", "").replace("T", " ")
             val parts = clean.split(" ")
             val dateParts = parts[0].split("-")

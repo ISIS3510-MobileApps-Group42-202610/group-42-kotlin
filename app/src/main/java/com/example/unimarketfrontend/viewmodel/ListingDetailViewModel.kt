@@ -180,6 +180,21 @@ class ListingDetailViewModel(
             metadata  = mapOf("entrypoint" to "contact_seller_button")
         )
     }
+    fun sendFirstMessage(sellerId: Int, content: String, onComplete: () -> Unit) {
+        viewModelScope.launch {
+                android.util.Log.d("CHAT_DEBUG", "Enviando a sellerId: $sellerId con contenido: $content")
+
+                val request = com.example.unimarketfrontend.network.model.SendMessageRequest(
+                    seller_id = sellerId,
+                    content = content
+                )
+
+                val response = RetrofitInstance.api.sendMessageAsBuyer(request)
+
+                android.util.Log.d("CHAT_DEBUG", "Servidor confirmó envío: ${response.id}")
+                onComplete()
+        }
+    }
 
     fun trackFirstMessageSent(messageLength: Int) {
         if (firstMessageSentTracked) return

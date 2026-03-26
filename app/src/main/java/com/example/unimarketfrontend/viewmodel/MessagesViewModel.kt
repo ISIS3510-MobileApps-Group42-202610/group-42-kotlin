@@ -32,13 +32,18 @@ class MessagesViewModel : ViewModel() {
 
                 val conversations = messages
                     .groupBy { it.seller?.id }
-                    .mapNotNull { (_, msgs) ->
+                    .mapNotNull { (sellerId, msgs) ->
+                        if (sellerId == null) return@mapNotNull null
+
                         val last = msgs.maxByOrNull { it.created_at ?: "" }
                             ?: return@mapNotNull null
-                        val sellerUser = last.seller?.user
+
+
+                        val user = last.seller?.user
+
                         ConversationPreview(
-                            otherPersonId = last.seller?.id ?: 0,
-                            otherPersonName = buildName(sellerUser?.name, sellerUser?.last_name),
+                            otherPersonId = sellerId,
+                            otherPersonName = buildName(user?.name, user?.last_name),
                             lastMessage = last.content,
                             lastMessageTime = formatTime(last.created_at),
                             isRead = last.is_read
@@ -46,7 +51,6 @@ class MessagesViewModel : ViewModel() {
                     }
 
                 val unreadCount = conversations.count { !it.isRead }
-
                 AnalyticsLogger.log(
                     "messages_screen_opened",
                     mapOf("unread_conversations" to unreadCount.toString())
@@ -54,13 +58,15 @@ class MessagesViewModel : ViewModel() {
 
                 _uiState.value = MessagesUiState.Success(conversations)
             } catch (e: Exception) {
-                _uiState.value = MessagesUiState.Error(e.message ?: "Unknown error")
+                _uiState.value = MessagesUiState.Error(e.message ?: "Error al cargar mensajes")
             }
         }
     }
 
-    private fun buildName(first: String?, last: String?): String =
-        listOfNotNull(first, last).joinToString(" ").ifBlank { "Unknown" }
+    private fun buildName(first: String?, last: String?): String {
+        val full = listOfNotNull(first, last).joinToString(" ").trim()
+        return full.ifBlank { "Vendedor Desconocido" }
+    }
 
     private fun formatTime(isoDate: String?): String {
         if (isoDate == null) return ""

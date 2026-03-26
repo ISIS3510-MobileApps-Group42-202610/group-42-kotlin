@@ -128,12 +128,22 @@ fun ListingDetailScreen(
                         TextButton(
                             onClick = {
                                 if (messageText.isNotBlank()) {
-                                    vm.trackFirstMessageSent(messageText.length)
+                                    val sId = seller?.id ?: 0
+                                    val sName = seller?.name ?: "Vendedor"
+
+                                    if (sId != 0) {
+                                        vm.sendFirstMessage(sId, messageText) {
+                                            navController.navigate("chat/$sId/$sName")
+                                        }
+                                    }
+
                                     messageText = ""
                                     showMessageDialog = false
                                 }
                             }
-                        ) { Text("Enviar") }
+                        ) {
+                            Text("Enviar")
+                        }
                     },
                     dismissButton = {
                         TextButton(onClick = { showMessageDialog = false }) { Text("Cancelar") }
