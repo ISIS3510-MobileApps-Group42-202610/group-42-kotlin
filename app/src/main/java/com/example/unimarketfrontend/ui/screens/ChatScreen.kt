@@ -86,7 +86,6 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Banner context-aware: solo aparece si el GPS detecta que estás en campus
             if (isOnCampus) {
                 Surface(
                     modifier = Modifier
@@ -110,7 +109,6 @@ fun ChatScreen(
                 }
             }
 
-            // Lista de mensajes — crece hacia abajo
             // reverseLayout = true hace que los mensajes nuevos aparezcan abajo
             LazyColumn(
                 modifier = Modifier
