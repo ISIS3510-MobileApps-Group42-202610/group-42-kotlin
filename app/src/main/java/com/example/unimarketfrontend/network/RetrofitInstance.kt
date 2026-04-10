@@ -6,6 +6,11 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
+
+
+// Patrón Singleton: Implementado en RetrofitInstance y AnalyticsLogger.
+//◦
+//Para qué sirve: Garantiza que solo exista una instancia del cliente de red en toda la app.
 object RetrofitInstance {
     private var prefs: SharedPreferences? = null
 
