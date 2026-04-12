@@ -32,7 +32,7 @@ fun ChatScreen(
 ) {
     // Observa la lista de mensajes del ViewModel
     val messages by viewModel.messages.collectAsState()
-    // Observa si hay un mensaje siendo enviado
+    // Observa si hay un mensaje siendo enviado y determina el estado actual
     val isSending by viewModel.isSending.collectAsState()
     // Estado local del campo de texto — no necesita persistir entre recomposiciones
     var inputText by remember { mutableStateOf("") }
