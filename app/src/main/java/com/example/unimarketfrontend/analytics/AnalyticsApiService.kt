@@ -10,6 +10,10 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 
 interface AnalyticsApiService {
+    //BQ4 EN EL CHAT VIEW MODEL COMPARA TIMESTAMP DE TIEMPO RTA DEL VENDEDOR
+    //ANALYTICS APPY SERVICE, ENVÍA EVENTOS Y LA RTA A LOS DIF ENDPOINTS DEL BACK
+    //BACKEND PYTHON/DJANGO
+
     @POST("api/business-events/")
     suspend fun sendBusinessEvent(
         @Body request: BusinessEventRequest

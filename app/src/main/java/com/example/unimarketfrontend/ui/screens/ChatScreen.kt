@@ -82,6 +82,9 @@ fun ChatScreen(
         }
     ) { innerPadding ->
         Column(
+            //este código completo hasta abajo expone cómo funciona la exposicion del smart feature
+            //chat screen exposes si está en campus, entonces que exponga que está cerca y que se pueden reunir en el mario laserna
+
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -143,6 +146,7 @@ fun ChatScreen(
                 Spacer(Modifier.width(8.dp))
                 IconButton(
                     onClick = {
+                        //espacio envío de mensajes
                         // isNotBlank verifica que no sea vacío ni solo espacios
                         if (inputText.isNotBlank()) {
                             viewModel.sendMessage(sellerId, inputText)
@@ -152,6 +156,7 @@ fun ChatScreen(
                     enabled = !isSending  // desactiva el botón mientras se está enviando
                 ) {
                     if (isSending) {
+                        //indicador de que mensaje se está enviando
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp
@@ -168,6 +173,7 @@ fun ChatScreen(
 // Burbuja de mensaje individual
 // isMine = true → burbuja a la derecha con color primario (mis mensajes)
 // isMine = false → burbuja a la izquierda con color secundario (mensajes del otro)
+//donde se alinean los mensajes en la pantalla
 @Composable
 private fun ChatBubble(content: String, isMine: Boolean) {
     Row(

@@ -3,6 +3,10 @@ package com.example.unimarketfrontend.analytics
 import okhttp3.Interceptor
 import okhttp3.Response
 
+
+// Intercepta las solicitudes HTTP y agrega el encabezado de autenticación
+//centraliza seguridad dentro de la app para que solo se pida una vez el token jwt
+//
 class AnalyticsAuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
