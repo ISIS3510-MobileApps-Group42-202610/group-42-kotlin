@@ -1,5 +1,6 @@
 package com.example.unimarketfrontend.ui.screens
 
+import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -67,7 +69,8 @@ fun ListingDetailScreen(
     navController: NavController,
     listingId: Int
 ) {
-    val vm: ListingDetailViewModel = viewModel(factory = ListingDetailViewModelFactory(listingId))
+    val app = LocalContext.current.applicationContext as Application
+    val vm: ListingDetailViewModel = viewModel(factory = ListingDetailViewModelFactory(app, listingId))
     val state by vm.uiState.collectAsState()
     var showMessageDialog by remember { mutableStateOf(false) }
     var messageText by remember { mutableStateOf("") }
@@ -242,13 +245,14 @@ fun ListingDetailScreen(
                         )
                     }
 
-                    if (listing.product.isNotBlank()) {
+                    val productDescription = listing.product.orEmpty().trim()
+                    if (productDescription.isNotBlank()) {
                         Spacer(modifier = Modifier.height(16.dp))
                         HorizontalDivider()
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(text = "Descripcion", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = listing.product, style = MaterialTheme.typography.bodyMedium)
+                        Text(text = productDescription, style = MaterialTheme.typography.bodyMedium)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

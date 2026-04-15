@@ -2,7 +2,6 @@ package com.example.unimarketfrontend.analytics
 
 import android.os.Build
 import android.util.Log
-import com.example.unimarketfrontend.BuildConfig
 import com.example.unimarketfrontend.analytics.model.PerformanceEventType
 import com.example.unimarketfrontend.analytics.model.PerformanceTelemetryRequest
 import kotlinx.coroutines.CoroutineScope
@@ -48,7 +47,7 @@ class PerformanceTracker(
             platform = "android",
             duration_ms = durationMs,
             os_version = Build.VERSION.RELEASE ?: "unknown",
-            app_version = BuildConfig.VERSION_NAME
+            app_version = appVersionName()
         )
 
         scope.launch {
@@ -62,6 +61,14 @@ class PerformanceTracker(
                 Log.w(TAG, "Performance telemetry failed", error)
             }
         }
+    }
+
+    // Avoid direct BuildConfig import: some AGP/Kotlin setups fail to expose it to this source set.
+    private fun appVersionName(): String {
+        return runCatching {
+            val buildConfigClass = Class.forName("com.example.unimarketfrontend.BuildConfig")
+            buildConfigClass.getField("VERSION_NAME").get(null) as? String
+        }.getOrNull().orEmpty().ifBlank { "unknown" }
     }
 
     private fun deviceModel(): String {
@@ -83,4 +90,3 @@ object PerformanceTrackerProvider {
         PerformanceTracker(api = AnalyticsRetrofitInstance.api)
     }
 }
-

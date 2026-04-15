@@ -6,7 +6,7 @@ data class Listing(
     val buyer_id: Int?,
     val course_id: Int?,
     val title: String,
-    val product: String,
+    val product: String?,
     val category: String?,
     val condition: String?,
     val original_price: Double?,
