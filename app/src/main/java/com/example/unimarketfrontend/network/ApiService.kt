@@ -84,3 +84,4 @@ interface ApiService {
     @DELETE("api/v1/reviews/{id}")
     suspend fun deleteReview(@Path("id") reviewId: Int): Response<Unit>
 }
+

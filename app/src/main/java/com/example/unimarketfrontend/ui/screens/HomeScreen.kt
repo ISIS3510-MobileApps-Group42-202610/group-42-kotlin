@@ -97,7 +97,7 @@ fun HomeScreen(
                     val categoryOk = selectedCategory == "All" || toDisplayCategory(listing.category) == selectedCategory
                     val queryOk = searchQuery.isBlank() ||
                         listing.title.contains(searchQuery, ignoreCase = true) ||
-                        listing.product.contains(searchQuery, ignoreCase = true)
+                        listing.product.orEmpty().contains(searchQuery, ignoreCase = true)
                     categoryOk && queryOk
                 }
             }
