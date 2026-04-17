@@ -1,16 +1,30 @@
 package com.example.unimarketfrontend.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.analytics.AnalyticsLogger
+import com.example.unimarketfrontend.local.db.AppDatabase
+import com.example.unimarketfrontend.network.ConnectivityMonitor
 import com.example.unimarketfrontend.network.RetrofitInstance
 import com.example.unimarketfrontend.network.model.Message
 import com.example.unimarketfrontend.network.model.SendMessageRequest
+import com.example.unimarketfrontend.repository.MessagesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class ChatViewModel : ViewModel() {
+/*
+ * ViewModel para la pantalla de chat individual.
+ * SPRINT 3: Ahora es un AndroidViewModel para acceder al contexto y usar Room.
+ * Implementamos Conectividad Eventual: si el usuario manda un mensaje sin red, 
+ * se guarda localmente y se marca como [Pending].
+ */
+class ChatViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val db = AppDatabase.getInstance(application)
+    private val repository = MessagesRepository(messagesDao = db.messagesDao())
 
     // Lista de mensajes del hilo actual
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
@@ -24,38 +38,69 @@ class ChatViewModel : ViewModel() {
     fun loadThread(sellerId: Int) {
         viewModelScope.launch {
             try {
+                // SPRINT 3: Podríamos implementar cache de mensajes por hilo aquí también.
                 val thread = RetrofitInstance.api.getThread(sellerId)
                 _messages.value = thread
-                // Calcula y registra el tiempo de respuesta del vendedor (BQ4)
+                
+                // BQ4: Tiempo de respuesta (Smart Feature)
                 computeAndLogResponseTime(thread, sellerId)
             } catch (e: Exception) {
-                // Si falla la carga, mantenemos los mensajes existentes
+                Log.e("CHAT_VM", "Error cargando hilo: ${e.message}")
             }
         }
     }
 
-    // Envía un mensaje y lo agrega localmente a la lista
+    // Envía un mensaje con soporte Offline (Eventual Connectivity)
     fun sendMessage(sellerId: Int, content: String) {
         viewModelScope.launch {
             _isSending.value = true
-            try {
-                val response = RetrofitInstance.api.sendMessageAsBuyer(
-                    SendMessageRequest(seller_id = sellerId, content = content)
-                )
+            
+            // Verificamos si hay internet usando nuestro Monitor (Sensor de red)
+            val isOnline = ConnectivityMonitor.isOnline.value
 
-                _messages.value = _messages.value + response
-                AnalyticsLogger.log("message_sent", mapOf("seller_id" to sellerId.toString()))
-
-            } catch (e: Exception) {
-                android.util.Log.e("CHAT_ERROR", "Error sending message: ${e.message}", e)
-            } finally {
-                _isSending.value = false
+            if (isOnline) {
+                try {
+                    // Intento de envío real al servidor NestJS
+                    val response = RetrofitInstance.api.sendMessageAsBuyer(
+                        SendMessageRequest(seller_id = sellerId, content = content)
+                    )
+                    _messages.value = _messages.value + response
+                    AnalyticsLogger.log("message_sent", mapOf("seller_id" to sellerId.toString()))
+                } catch (e: Exception) {
+                    // Si falla el servidor pero el monitor decía que había red, 
+                    // lo mandamos a la cola de pendientes para no perder el dato (Evita UC)
+                    Log.w("CHAT_VM", "Fallo envio con red, guardando pendiente")
+                    saveLocally(sellerId, content)
+                }
+            } else {
+                // SPRINT 3: Sin red, directo a la base de datos local (Room)
+                saveLocally(sellerId, content)
             }
+            
+            _isSending.value = false
         }
     }
 
-    // BQ4: para cada mensaje del comprador, busca la primera respuesta del vendedor
-    // y calcula cuántos minutos tardó en responder
+    // Guarda el mensaje en Room y lo muestra en la UI con tag de pendiente
+    private suspend fun saveLocally(sellerId: Int, content: String) {
+        repository.savePendingMessage(sellerId, content)
+        
+        // Creamos un mensaje "ficticio" para que el usuario lo vea de una vez (Feedback inmediato)
+        val tempMessage = Message(
+            id = -1,
+            content = "[Pending] $content",
+            sent_by = "buyer",
+            is_read = false,
+            created_at = null,
+            seller_id = sellerId, // Lo pide el modelo
+            buyer_id = null,      // Lo dejamos null porque es local
+            seller = null,
+            buyer = null
+        )
+        _messages.value += tempMessage
+    }
+
+    // BQ4: Algoritmo para calcular eficiencia del vendedor basado en timestamps
     private fun computeAndLogResponseTime(messages: List<Message>, sellerId: Int) {
         val buyerMessages = messages.filter { it.sent_by == "buyer" }
         val sellerReplies = messages.filter { it.sent_by == "seller" }
@@ -66,13 +111,12 @@ class ChatViewModel : ViewModel() {
 
         for (buyerMsg in buyerMessages) {
             val sentAt = parseMillis(buyerMsg.created_at) ?: continue
-            // Busca la primera respuesta del vendedor que llegó DESPUÉS del mensaje del comprador
             val firstReply = sellerReplies
                 .mapNotNull { parseMillis(it.created_at) }
-                .filter { it > sentAt }
+                .filter { it > sentAt } // Buscamos la respuesta inmediata posterior
                 .minOrNull() ?: continue
-            // Convierte la diferencia de milisegundos a minutos
-            responseTimes.add((firstReply - sentAt) / 60_000)
+            
+            responseTimes.add((firstReply - sentAt) / 60_000) // Diferencia en minutos
         }
 
         if (responseTimes.isNotEmpty()) {
@@ -87,14 +131,10 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    // Convierte una fecha ISO 8601 a milisegundos desde epoch
-    // Devuelve null si la fecha no se puede parsear
-    // Para esta función utilicé lo que era: https://github.com/Kotlin/kotlinx-datetime.git para poder aplicarla
-    // No es totalmente de mi autoría, la usé con base a esa librería
+    // Helper para parsear fechas ISO 8601 a milisegundos (Basado en lógica de kotlinx-datetime)
     private fun parseMillis(iso: String?): Long? {
         if (iso == null) return null
         return try {
-            // ISO format: "2026-03-19T14:30:00.000Z"
             val clean = iso.replace("Z", "").replace("T", " ")
             val parts = clean.split(" ")
             val dateParts = parts[0].split("-")
@@ -104,7 +144,7 @@ class ChatViewModel : ViewModel() {
             val day = dateParts[2].toInt()
             val hour = timeParts[0].toInt()
             val min = timeParts[1].toInt()
-            // Aproximación simple en milisegundos suficiente para calcular diferencias
+            
             ((year - 1970).toLong() * 365 * 24 * 3600 * 1000) +
                     (month.toLong() * 30 * 24 * 3600 * 1000) +
                     (day.toLong() * 24 * 3600 * 1000) +

@@ -2,6 +2,7 @@ package com.example.unimarketfrontend.analytics
 
 import android.os.Build
 import android.util.Log
+import com.example.unimarketfrontend.analytics.model.BusinessEventName
 import com.example.unimarketfrontend.analytics.model.PerformanceEventType
 import com.example.unimarketfrontend.analytics.model.PerformanceTelemetryRequest
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +23,13 @@ class PerformanceTracker(
             eventType = PerformanceEventType.APP_STARTUP,
             durationMs = durationMs
         )
+    }
+    /*
+ * Funcion para trackear la BQ10.
+ * Registra que al usuario le salio el aviso de "Estas en la U".
+ */
+    fun trackCampusBannerShown(listingId: Int, sellerId: Int?) {
+        trackEvent(BusinessEventName.CAMPUS_BANNER_SHOWN, listingId, sellerId, null)
     }
 
     fun markNavigationStart(fromRoute: String?, toRoute: String) {
@@ -89,4 +97,5 @@ object PerformanceTrackerProvider {
     val tracker: PerformanceTracker by lazy {
         PerformanceTracker(api = AnalyticsRetrofitInstance.api)
     }
+
 }

@@ -147,6 +147,16 @@ class BusinessAnalyticsTracker(
         }
     }
 
+    //SPRINT 3 - BQ10: Funcion para registrar cuando el usuario ve el banner de la U
+    fun trackCampusBannerShown(
+        listingId: Int,
+        sellerId: Int?,metadata: Map<String, Any?>? = null
+    ) {
+        trackEvent(BusinessEventName.CAMPUS_BANNER_SHOWN, listingId, sellerId, metadata)
+    }
+
+
+
     private fun nowIsoUtc(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")

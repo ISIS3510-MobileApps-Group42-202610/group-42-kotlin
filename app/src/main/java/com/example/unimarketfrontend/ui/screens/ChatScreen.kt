@@ -1,4 +1,3 @@
-
 package com.example.unimarketfrontend.ui.screens
 
 import android.Manifest
@@ -12,6 +11,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,47 +23,65 @@ import com.example.unimarketfrontend.location.LocationHelper
 import com.example.unimarketfrontend.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
 
+/*
+ * Esta pantalla maneja la conversacion individual entre un comprador y un vendedor.
+ * Es la pieza clave para la BQ4 (tiempos de respuesta) y la BQ10 (efecto del campus).
+ * Implementa una arquitectura reactiva donde la UI solo dibuja lo que el StateFlow emite.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     navController: NavController,
-    sellerId: Int,
-    sellerName: String,
+    sellerId: Int,      // ID del vendedor que viene de la ruta de navegacion
+    sellerName: String, // Nombre del vendedor para mostrar en el TopBar
     viewModel: ChatViewModel = viewModel()
 ) {
-    // Observa la lista de mensajes del ViewModel
+    // Suscripcion reactiva a la lista de mensajes (Patron Observer)
     val messages by viewModel.messages.collectAsState()
-    // Observa si hay un mensaje siendo enviado y determina el estado actual
+
+    // Estado que bloquea el boton de enviar mientras la peticion viaja al servidor (UX)
     val isSending by viewModel.isSending.collectAsState()
-    // Estado local del campo de texto — no necesita persistir entre recomposiciones
+
+    // Estado local para lo que el usuario escribe en el teclado
     var inputText by remember { mutableStateOf("") }
-    // Estado local de si el usuario está en el campus
+
+    // Estado de la Smart Feature: ¿Esta el usuario fisicamente en la U?
     var isOnCampus by remember { mutableStateOf(false) }
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Launcher para pedir el permiso de ubicación al usuario
-    // Se ejecuta cuando el usuario acepta o rechaza el permiso
+    // Gestion de permisos nativos para el sensor GPS (Google Play Services)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
             coroutineScope.launch {
+                // Si el usuario acepta, el helper calcula la posicion con Haversine
                 isOnCampus = LocationHelper.isOnCampus(context)
             }
         }
     }
 
-    // LaunchedEffect se ejecuta UNA SOLA VEZ cuando la pantalla aparece
-    // sellerId es la "key" — si cambia, se ejecuta de nuevo
+    // Efecto de carga inicial: se dispara cada vez que cambia el sellerId
     LaunchedEffect(sellerId) {
-        // Carga los mensajes del hilo con este vendedor
+        // Traemos el historial de mensajes desde la DB local (Room) o el servidor
         viewModel.loadThread(sellerId)
-        // Verifica si el usuario está en el campus
+
+        // Verificamos el contexto fisico para la feature Context-Aware
         if (LocationHelper.hasPermission(context)) {
             isOnCampus = LocationHelper.isOnCampus(context)
+
+            // SPRINT 3 - BQ10: Si el sensor dice que estamos en la U, registramos el evento.
+            // Esto sirve para ver si la sugerencia de sitio de encuentro aumenta las ventas.
+            if (isOnCampus) {
+                com.example.unimarketfrontend.analytics.BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
+                    listingId = -1, // No tenemos el listing aca, mandamos -1 por ahora
+                    sellerId = sellerId
+                )
+            }
         } else {
-            // Pide el permiso si no lo tiene
+            // Si no hay permiso, lo pedimos (Estrategia de Conectividad Eventual)
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
@@ -70,10 +89,8 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                // Muestra el nombre del vendedor en la barra superior
                 title = { Text(sellerName) },
                 navigationIcon = {
-                    // Botón de volver atrás
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
@@ -82,13 +99,12 @@ fun ChatScreen(
         }
     ) { innerPadding ->
         Column(
-            //este código completo hasta abajo expone cómo funciona la exposicion del smart feature
-            //chat screen exposes si está en campus, entonces que exponga que está cerca y que se pueden reunir en el mario laserna
-
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // --- SMART FEATURE: BANNER CONTEXTUAL ---
+            // Solo aparece si el sensor GPS confirma que el usuario esta a < 600m del campus
             if (isOnCampus) {
                 Surface(
                     modifier = Modifier
@@ -112,24 +128,24 @@ fun ChatScreen(
                 }
             }
 
-            // reverseLayout = true hace que los mensajes nuevos aparezcan abajo
+            // Lista de mensajes: usa reverseLayout para que los nuevos salgan abajo (tipo WhatsApp)
+            // Es eficiente en memoria gracias a LazyColumn
             LazyColumn(
                 modifier = Modifier
-                    .weight(1f)  // ocupa todo el espacio disponible entre el banner y el input
+                    .weight(1f)
                     .padding(horizontal = 16.dp),
                 reverseLayout = true
             ) {
-                // .reversed() porque reverseLayout invierte el orden visual
                 items(messages.reversed()) { message ->
                     ChatBubble(
                         content = message.content,
-                        // Si sent_by es "buyer", el mensaje es mío (va a la derecha)
+                        // Diferenciamos visualmente mis mensajes de los del vendedor
                         isMine = message.sent_by == "buyer"
                     )
                 }
             }
 
-            // Fila de input para escribir y enviar mensajes
+            // Input de texto y boton de envio
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -146,17 +162,15 @@ fun ChatScreen(
                 Spacer(Modifier.width(8.dp))
                 IconButton(
                     onClick = {
-                        //espacio envío de mensajes
-                        // isNotBlank verifica que no sea vacío ni solo espacios
                         if (inputText.isNotBlank()) {
+                            // SPRINT 3: Esta funcion ahora maneja colas de pendientes si no hay red
                             viewModel.sendMessage(sellerId, inputText)
-                            inputText = ""  // limpia el campo después de enviar
+                            inputText = ""
                         }
                     },
-                    enabled = !isSending  // desactiva el botón mientras se está enviando
+                    enabled = !isSending
                 ) {
                     if (isSending) {
-                        //indicador de que mensaje se está enviando
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp
@@ -170,24 +184,22 @@ fun ChatScreen(
     }
 }
 
-// Burbuja de mensaje individual
-// isMine = true → burbuja a la derecha con color primario (mis mensajes)
-// isMine = false → burbuja a la izquierda con color secundario (mensajes del otro)
-//donde se alinean los mensajes en la pantalla
+/*
+ * Componente visual para las burbujas de chat.
+ * Implementa la logica de alineacion (derecha/izquierda) segun el autor.
+ */
 @Composable
 private fun ChatBubble(content: String, isMine: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        // Alinea a la derecha si es mío, a la izquierda si es del otro
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
     ) {
         Surface(
             shape = MaterialTheme.shapes.medium,
             color = if (isMine) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.surfaceVariant,
-            // Limita el ancho de la burbuja para que no ocupe toda la pantalla
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
             Text(
