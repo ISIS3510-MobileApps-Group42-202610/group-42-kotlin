@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.network.CloudinaryUploadService
 import com.example.unimarketfrontend.network.RetrofitInstance
 import com.example.unimarketfrontend.network.model.CloudinarySignatureRequest
+import com.example.unimarketfrontend.network.model.Course
 import com.example.unimarketfrontend.network.model.CreateListingRequest
 import com.example.unimarketfrontend.network.model.Listing
 import kotlinx.coroutines.Dispatchers
@@ -34,8 +35,41 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
     private val _state =
         MutableStateFlow<CreateListingState>(CreateListingState.Idle)
-
     val state: StateFlow<CreateListingState> = _state
+
+    private val _courses = MutableStateFlow<List<Course>>(emptyList())
+    val courses: StateFlow<List<Course>> = _courses
+
+    private val _isLoadingCourses = MutableStateFlow(false)
+    val isLoadingCourses: StateFlow<Boolean> = _isLoadingCourses
+
+    private val _coursesError = MutableStateFlow<String?>(null)
+    val coursesError: StateFlow<String?> = _coursesError
+
+    fun loadCourses(forceReload: Boolean = false) {
+        if (_isLoadingCourses.value) return
+        if (!forceReload && _courses.value.isNotEmpty()) return
+
+        viewModelScope.launch {
+            _isLoadingCourses.value = true
+            _coursesError.value = null
+
+            try {
+                val response = RetrofitInstance.api.getCourses()
+                if (!response.isSuccessful || response.body() == null) {
+                    _coursesError.value = buildHttpError("Carga de cursos", response)
+                    return@launch
+                }
+
+                _courses.value = response.body()!!
+                    .sortedWith(compareBy<Course> { it.code }.thenBy { it.name })
+            } catch (e: Exception) {
+                _coursesError.value = e.message ?: "No se pudieron cargar los cursos"
+            } finally {
+                _isLoadingCourses.value = false
+            }
+        }
+    }
 
     private fun buildHttpError(context: String, response: Response<*>): String {
         val errorBody = try {
@@ -174,6 +208,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Comfortable and spacious furniture"
                 )
             }
+
             else -> {
                 SmartSuggestion(
                     category = "Other",

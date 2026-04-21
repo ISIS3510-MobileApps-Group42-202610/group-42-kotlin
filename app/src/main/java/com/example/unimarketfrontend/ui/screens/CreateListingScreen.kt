@@ -17,8 +17,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +33,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +88,9 @@ fun CreateListingScreen(
     viewModel: CreateListingViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val courses by viewModel.courses.collectAsState()
+    val isLoadingCourses by viewModel.isLoadingCourses.collectAsState()
+    val coursesError by viewModel.coursesError.collectAsState()
     val context = LocalContext.current
 
     var title by remember { mutableStateOf("") }
@@ -97,6 +104,20 @@ fun CreateListingScreen(
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     val selectedCondition = remember { mutableStateOf(ListingCondition.NEW) }
     var selectedCategory by remember { mutableStateOf("Books") }
+    var selectedCourseId by remember { mutableStateOf<Int?>(null) }
+    var isCourseMenuExpanded by remember { mutableStateOf(false) }
+    var courseSearchQuery by remember { mutableStateOf("") }
+
+    val filteredCourses = remember(courses, courseSearchQuery) {
+        val query = courseSearchQuery.trim()
+        if (query.isBlank()) {
+            courses
+        } else {
+            courses.filter { course ->
+                course.selectorLabel().contains(query, ignoreCase = true)
+            }
+        }
+    }
 
     val categoryMap = mapOf(
         "Books" to ListingCategory.TEXTBOOK,
@@ -137,6 +158,10 @@ fun CreateListingScreen(
         } else {
             localError = "Se requiere permiso de camara para tomar fotos"
         }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadCourses()
     }
 
     LaunchedEffect(state) {
@@ -329,6 +354,116 @@ fun CreateListingScreen(
                 }
             }
 
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .shadow(
+                        elevation = 4.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        ambientColor = Color.Black.copy(alpha = 0.08f)
+                    )
+                    .background(Color.White, RoundedCornerShape(14.dp))
+                    .clickable { isCourseMenuExpanded = !isCourseMenuExpanded }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                val selectedCourseLabel = courses
+                    .firstOrNull { it.id == selectedCourseId }
+                    ?.selectorLabel()
+                    ?: "Curso (opcional)"
+
+                Text(
+                    text = selectedCourseLabel,
+                    color = TextPrimary,
+                    fontSize = 14.sp
+                )
+            }
+
+            if (isCourseMenuExpanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(
+                            elevation = 4.dp,
+                            shape = RoundedCornerShape(14.dp),
+                            ambientColor = Color.Black.copy(alpha = 0.08f)
+                        )
+                        .background(Color(0xFFEFF1FC), RoundedCornerShape(14.dp))
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    NeumorphicTextField(
+                        value = courseSearchQuery,
+                        onValueChange = { courseSearchQuery = it },
+                        label = "Buscar curso",
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
+                        }
+                    )
+
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 220.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        selectedCourseId = null
+                                        isCourseMenuExpanded = false
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 10.dp)
+                            ) {
+                                Text("Sin curso (opcional)", color = TextPrimary, fontSize = 13.sp)
+                            }
+                        }
+
+                        if (filteredCourses.isNotEmpty()) {
+                            items(filteredCourses) { course ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            selectedCourseId = course.id
+                                            isCourseMenuExpanded = false
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 10.dp)
+                                ) {
+                                    Text(course.selectorLabel(), color = TextPrimary, fontSize = 13.sp)
+                                }
+                                Divider(color = Color(0xFFD8DEEE), thickness = 0.5.dp)
+                            }
+                        } else {
+                            item {
+                                Text(
+                                    text = "No hay cursos para '${'$'}courseSearchQuery'",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isLoadingCourses) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Cargando cursos...", color = TextSecondary, fontSize = 12.sp)
+                }
+            }
+
+            if (coursesError != null) {
+                Text(text = coursesError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+            }
+
             AccentButton(
                 text = "Publish",
                 onClick = {
@@ -346,7 +481,7 @@ fun CreateListingScreen(
                                 condition = selectedCondition.value.value,
                                 original_price = null,
                                 selling_price = parsedPrice,
-                                course_id = null
+                                course_id = selectedCourseId
                             )
                             viewModel.createListing(request, selectedImageUris)
                         }
