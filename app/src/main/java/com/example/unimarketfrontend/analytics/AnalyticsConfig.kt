@@ -1,7 +1,6 @@
-
 package com.example.unimarketfrontend.analytics
 
-
+// Modelo de configuración para el analytics engine
 object AnalyticsConfig {
     const val ANALYTICS_BASE_URL = "https://group-42-analytic-engine-back.vercel.app/"
 

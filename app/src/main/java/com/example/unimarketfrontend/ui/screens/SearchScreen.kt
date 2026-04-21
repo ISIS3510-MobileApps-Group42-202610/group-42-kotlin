@@ -30,12 +30,21 @@ import androidx.navigation.NavController
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import com.example.unimarketfrontend.viewmodel.SearchViewModel
 
+
+/*
+ * Esta es la pantalla de busqueda de la app.
+ * La idea aca es que el usuario pueda encontrar productos rapido sin
+ * tener que navegar por todas las categorias.
+ */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     navController: NavController,
     viewModel: SearchViewModel = viewModel()
 ) {
+    // Aca aplicamos el patron Observer: nos suscribimos a los flujos del ViewModel
+    // Cada vez que cambie la consulta o los resultados, Compose redibuja la pantalla
     val query by viewModel.query.collectAsState()
     val results by viewModel.results.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -45,6 +54,7 @@ fun SearchScreen(
             TopAppBar(title = { Text("Search") })
         },
         bottomBar = {
+            // El menu de navegacion de abajo para movernos entre secciones
             BottomNavigationBar(
                 currentRoute = "search",
                 onRouteChange = { route ->
@@ -64,6 +74,8 @@ fun SearchScreen(
         ) {
             Spacer(Modifier.height(8.dp))
 
+            // Este es el campo de texto donde el usuario escribe
+            // Cada vez que cambia el texto, le avisamos al ViewModel para que filtre
             OutlinedTextField(
                 value = query,
                 onValueChange = { viewModel.onQueryChange(it) },
@@ -74,11 +86,14 @@ fun SearchScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            // Aca manejamos la logica visual de los diferentes estados de la busqueda
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
+                    // Estado 1: El sistema esta procesando la busqueda
                     isLoading -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
+                    // Estado 2: El usuario no ha escrito nada todavia
                     query.isBlank() -> {
                         Text(
                             text = "Type to search for listings",
@@ -86,6 +101,7 @@ fun SearchScreen(
                             modifier = Modifier.align(Alignment.Center)
                         )
                     }
+                    // Estado 3: Escribio algo pero no hay coincidencias en la base de datos
                     results.isEmpty() -> {
                         Text(
                             text = "No results for \"$query\"",
@@ -93,6 +109,7 @@ fun SearchScreen(
                             modifier = Modifier.align(Alignment.Center)
                         )
                     }
+                    // Estado 4: Mostramos la lista de resultados usando LazyColumn para ahorrar memoria
                     else -> {
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -114,6 +131,10 @@ fun SearchScreen(
     }
 }
 
+/*
+ * Este es un componente pequeno para mostrar cada producto en la lista de busqueda.
+ * Lo hice separado para que el codigo sea mas limpio y facil de mantener.
+ */
 @Composable
 private fun SearchResultCard(
     title: String,
@@ -134,6 +155,7 @@ private fun SearchResultCard(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(Modifier.height(2.dp))
+            // Mostramos la condicion y categoria para que el usuario decida mejor
             Text(
                 text = "$condition · $category",
                 style = MaterialTheme.typography.bodySmall,

@@ -6,7 +6,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.unimarketfrontend.network.model.AnalyticsEvent
 
-
+// BQ4 EN CHAT VIEW MODEL
+//BQ2 TMB EN CHAT VIEW MODEL
+//SMART FEATURE EN LOCATION HELPER
 // Singleton global para enviar eventos al analytics engine
 object AnalyticsLogger {
 

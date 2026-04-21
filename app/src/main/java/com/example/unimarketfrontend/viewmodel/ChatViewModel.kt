@@ -89,6 +89,8 @@ class ChatViewModel : ViewModel() {
 
     // Convierte una fecha ISO 8601 a milisegundos desde epoch
     // Devuelve null si la fecha no se puede parsear
+    // Para esta función utilicé lo que era: https://github.com/Kotlin/kotlinx-datetime.git para poder aplicarla
+    // No es totalmente de mi autoría, la usé con base a esa librería
     private fun parseMillis(iso: String?): Long? {
         if (iso == null) return null
         return try {
