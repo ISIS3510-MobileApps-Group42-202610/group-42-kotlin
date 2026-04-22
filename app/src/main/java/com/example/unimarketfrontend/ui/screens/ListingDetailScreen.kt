@@ -63,6 +63,10 @@ import com.example.unimarketfrontend.viewmodel.ListingDetailViewModelFactory
 import java.util.Locale
 import kotlin.math.floor
 
+/*
+ * Pantalla de detalle del producto - SPRINT 3
+ * Corregimos los errores de analiticas y sincronizamos con el nuevo ViewModel.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListingDetailScreen(
@@ -131,16 +135,14 @@ fun ListingDetailScreen(
                         TextButton(
                             onClick = {
                                 if (messageText.isNotBlank()) {
-                                    vm.trackFirstMessageSent(messageText.length)
-                                    vm.sendMessage(
+                                    // SPRINT 3: Mandamos el primer mensaje y navegamos
+                                    vm.sendFirstMessage(
+                                        sellerId = listing.seller_id,
                                         content = messageText,
-                                        onSuccess = {
-                                            messageText = ""
+                                        onComplete = {
+                                            // Al terminar, cerramos y mandamos al chat
                                             showMessageDialog = false
-                                        },
-                                        onError = {
-                                            messageText = ""
-                                            showMessageDialog = false
+                                            navController.navigate("chat/${listing.seller_id}/${seller?.name ?: "Vendedor"}")
                                         }
                                     )
                                 }
@@ -174,6 +176,7 @@ fun ListingDetailScreen(
                 ) {
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // Carrusel de imagenes
                     if (images.isNotEmpty()) {
                         AsyncImage(
                             model = images[selectedImageIndex].url,
@@ -275,28 +278,14 @@ fun ListingDetailScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Boton para iniciar contacto
                     Button(
                         onClick = {
-                            vm.trackChatStarted()
                             showMessageDialog = true
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Contactar vendedor")
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedButton(
-                        onClick = {
-                            if (!transactionTracked) {
-                                vm.trackTransactionCompleted()
-                                transactionTracked = true
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (transactionTracked) "Transaccion registrada" else "Marcar transaccion completada")
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
