@@ -2,6 +2,7 @@ package com.example.unimarketfrontend.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import android.util.LruCache
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.network.CloudinaryUploadService
@@ -33,6 +34,17 @@ data class SmartSuggestion(
 
 class CreateListingViewModel(application: Application) : AndroidViewModel(application) {
 
+    private data class CoursesCacheEntry(
+        val courses: List<Course>,
+        val cachedAtMillis: Long
+    )
+
+    private companion object {
+        const val COURSES_CACHE_KEY = "all_courses"
+        const val COURSES_CACHE_TTL_MS = 2 * 60 * 1000L
+        val coursesCache = LruCache<String, CoursesCacheEntry>(1)
+    }
+
     private val _state =
         MutableStateFlow<CreateListingState>(CreateListingState.Idle)
     val state: StateFlow<CreateListingState> = _state
@@ -48,7 +60,17 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
     fun loadCourses(forceReload: Boolean = false) {
         if (_isLoadingCourses.value) return
-        if (!forceReload && _courses.value.isNotEmpty()) return
+
+        if (!forceReload) {
+            val recentCachedCourses = getRecentCachedCourses()
+            if (recentCachedCourses != null) {
+                _courses.value = recentCachedCourses
+                _coursesError.value = null
+                return
+            }
+
+            if (_courses.value.isNotEmpty()) return
+        }
 
         viewModelScope.launch {
             _isLoadingCourses.value = true
@@ -61,14 +83,39 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     return@launch
                 }
 
-                _courses.value = response.body()!!
+                val sortedCourses = response.body()!!
                     .sortedWith(compareBy<Course> { it.code }.thenBy { it.name })
+
+                _courses.value = sortedCourses
+                cacheCourses(sortedCourses)
             } catch (e: Exception) {
                 _coursesError.value = e.message ?: "No se pudieron cargar los cursos"
             } finally {
                 _isLoadingCourses.value = false
             }
         }
+    }
+
+    private fun getRecentCachedCourses(): List<Course>? {
+        val cached = coursesCache.get(COURSES_CACHE_KEY) ?: return null
+        val isRecent = System.currentTimeMillis() - cached.cachedAtMillis <= COURSES_CACHE_TTL_MS
+
+        if (!isRecent) {
+            coursesCache.remove(COURSES_CACHE_KEY)
+            return null
+        }
+
+        return cached.courses
+    }
+
+    private fun cacheCourses(courses: List<Course>) {
+        coursesCache.put(
+            COURSES_CACHE_KEY,
+            CoursesCacheEntry(
+                courses = courses,
+                cachedAtMillis = System.currentTimeMillis()
+            )
+        )
     }
 
     private fun buildHttpError(context: String, response: Response<*>): String {
