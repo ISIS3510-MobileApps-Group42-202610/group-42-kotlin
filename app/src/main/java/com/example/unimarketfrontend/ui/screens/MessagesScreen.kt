@@ -21,20 +21,29 @@ import androidx.navigation.NavController
 import com.example.unimarketfrontend.network.model.ConversationPreview
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import com.example.unimarketfrontend.ui.navigation.navigateTracked
-import com.example.unimarketfrontend.viewmodel.MessagesUiState
 import com.example.unimarketfrontend.viewmodel.MessagesViewModel
 
-
+/*
+ * Pantalla principal del modulo de mensajeria para el Sprint 3.
+ * Implementa el Patron Observer para reaccionar a cambios en la DB local (Room).
+ * Incluye un banner informativo para casos de falta de conectividad (Evita NIM antipattern).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessagesScreen(
     navController: NavController,
     viewModel: MessagesViewModel = viewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
+    // Observamos el estado del ViewModel (Lista de conversaciones, estado de carga y red)
+    val conversations by viewModel.conversations.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val isOffline by viewModel.isOffline.collectAsState()
+
+    // Cada vez que el usuario entra, intentamos refrescar los datos del servidor
     LaunchedEffect(Unit) {
         viewModel.loadConversations()
     }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -55,77 +64,82 @@ fun MessagesScreen(
         }
     ) { innerPadding ->
 
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (state) {
-
-                is MessagesUiState.Loading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
+            // --- SPRINT 3: GESTION DE CONECTIVIDAD ---
+            // Si el monitor detecta que no hay internet, avisamos al usuario (Evita NIM)
+            if (isOffline) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Text(
+                        text = "You are offline. Showing saved conversations.",
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
+            }
 
-                is MessagesUiState.Error -> {
+            // Indicador de que estamos buscando datos nuevos en background (Cache-then-Network)
+            if (isRefreshing) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (conversations.isEmpty() && !isRefreshing) {
+                    // Estado vacio: el usuario no tiene chats guardados ni red para bajar nuevos
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = "Could not load messages",
-                            color = MaterialTheme.colorScheme.error
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.outline
                         )
-
-
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = "No messages yet",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Text(
+                            text = "Contact a seller to start a conversation",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
                     }
-                }
-
-                is MessagesUiState.Success -> {
-                    val conversations = (state as MessagesUiState.Success).conversations
-
-                    if (conversations.isEmpty()) {
-                        Column(
-                            modifier = Modifier.align(Alignment.Center),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.outline
+                } else {
+                    // Lista de conversaciones reactiva (conecta con Room)
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(conversations) { entity ->
+                            ConversationRow(
+                                // Mapeamos la entidad de Room al modelo de vista
+                                conversation = ConversationPreview(
+                                    otherPersonId = entity.otherPersonId,
+                                    otherPersonName = entity.otherPersonName,
+                                    lastMessage = entity.lastMessage,
+                                    lastMessageTime = entity.lastMessageTime,
+                                    isRead = entity.isRead
+                                ),
+                                onClick = {
+                                    navController.navigate(
+                                        "chat/${entity.otherPersonId}/${
+                                            java.net.URLEncoder.encode(entity.otherPersonName, "UTF-8")
+                                        }"
+                                    )
+                                }
                             )
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                text = "No messages yet",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.outline
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 76.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant
                             )
-                            Text(
-                                text = "Contact a seller to start a conversation",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            items(conversations) { conversation ->
-                                ConversationRow(
-                                    conversation = conversation,
-                                    onClick = {
-                                        navController.navigate(
-                                            "chat/${conversation.otherPersonId}/${
-                                                java.net.URLEncoder.encode(conversation.otherPersonName, "UTF-8")
-                                            }"
-                                        )
-                                    }
-                                )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(start = 76.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant
-                                )
-                            }
                         }
                     }
                 }
@@ -134,6 +148,10 @@ fun MessagesScreen(
     }
 }
 
+/*
+ * Fila individual para cada conversacion en la lista.
+ * Resalta visualmente si hay mensajes pendientes de lectura.
+ */
 @Composable
 fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {}) {
     Row(
@@ -143,7 +161,7 @@ fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {})
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
+        // Icono de perfil generico
         Box(
             modifier = Modifier
                 .size(50.dp)
@@ -163,8 +181,8 @@ fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {})
 
         Spacer(Modifier.width(12.dp))
 
+        // Info de la conversacion (Nombre, Mensaje, Hora)
         Column(modifier = Modifier.weight(1f)) {
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -194,6 +212,8 @@ fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {})
                     MaterialTheme.colorScheme.outline
             )
         }
+        
+        // Punto azul de notificacion para mensajes no leidos
         if (!conversation.isRead) {
             Spacer(Modifier.width(8.dp))
             Box(

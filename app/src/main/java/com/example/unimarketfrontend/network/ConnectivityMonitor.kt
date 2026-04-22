@@ -5,50 +5,44 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
-class ConnectivityMonitor(context: Context) {
+/*
+ * Monitorea el estado de la conexion a internet en tiempo real.
+ * Sigue el patron Singleton para que toda la app consulte el mismo estado.
+ * El libro Ch. 10 recomienda informar al usuario sobre la conectividad para evitar NIM.
+ */
+object ConnectivityMonitor {
 
-    private val connectivityManager =
-        context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val _isOnline = MutableStateFlow(true)
+    val isOnline: StateFlow<Boolean> = _isOnline
 
-    val isOnline: Flow<Boolean> = callbackFlow {
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                trySend(true)
-            }
-
-            override fun onLost(network: Network) {
-                trySend(hasInternetConnection())
-            }
-
-            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                trySend(hasInternetConnection())
-            }
-        }
-
-        trySend(hasInternetConnection())
+    // Se llama en el onCreate del MainActivity para prender los sensores de red
+    fun start(context: Context) {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        
+        // Verificacion inicial
+        _isOnline.value = isCurrentlyConnected(cm)
 
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
 
-        connectivityManager.registerNetworkCallback(request, callback)
+        cm.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                _isOnline.value = true
+            }
 
-        awaitClose {
-            connectivityManager.unregisterNetworkCallback(callback)
-        }
-    }.distinctUntilChanged()
+            override fun onLost(network: Network) {
+                _isOnline.value = false
+            }
+        })
+    }
 
-    fun isCurrentlyOnline(): Boolean = hasInternetConnection()
-
-    private fun hasInternetConnection(): Boolean {
-        val network = connectivityManager.activeNetwork ?: return false
-        val caps = connectivityManager.getNetworkCapabilities(network) ?: return false
+    private fun isCurrentlyConnected(cm: ConnectivityManager): Boolean {
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }
-

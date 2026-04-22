@@ -5,16 +5,25 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.unimarketfrontend.local.dao.ListingDao
+import com.example.unimarketfrontend.local.dao.MessagesDao
 import com.example.unimarketfrontend.local.entity.ListingEntity
+import com.example.unimarketfrontend.local.entity.ConversationEntity
+import com.example.unimarketfrontend.local.entity.PendingMessageEntity
 
+/*
+ * Esta es la base de datos principal de la app usando Room.
+ * Aca centralizamos todas las tablas (entities) y los puntos de acceso (DAOs).
+ * Sigue el patron Singleton para no abrir multiples conexiones al archivo .db.
+ */
 @Database(
-    entities = [ListingEntity::class],
-    version = 2,
+    entities = [ListingEntity::class, ConversationEntity::class, PendingMessageEntity::class],
+    version = 3, // Subimos la version porque agregamos tablas de mensajes
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun listingDao(): ListingDao
+    abstract fun messagesDao(): MessagesDao
 
     companion object {
         @Volatile
@@ -27,7 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "unimarket.db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration() // Si cambiamos el esquema, borra y recrea la DB
                     .build()
                     .also { instance = it }
             }
