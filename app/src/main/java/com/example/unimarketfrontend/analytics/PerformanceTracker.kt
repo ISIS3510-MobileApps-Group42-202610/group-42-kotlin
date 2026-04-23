@@ -2,20 +2,26 @@ package com.example.unimarketfrontend.analytics
 
 import android.os.Build
 import android.util.Log
-import com.example.unimarketfrontend.analytics.model.BusinessEventName
 import com.example.unimarketfrontend.analytics.model.PerformanceEventType
 import com.example.unimarketfrontend.analytics.model.PerformanceTelemetryRequest
+import com.example.unimarketfrontend.network.AnalyticsApiService
+import com.example.unimarketfrontend.network.AnalyticsRetrofitInstance
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+/*
+ * Este es el PerformanceTracker.
+ * Solo se encarga de medir que tan rapido abre la app y que tan rapido navega.
+ */
 class PerformanceTracker(
     private val api: AnalyticsApiService,
     private val navigationTimingStore: NavigationTimingStore = NavigationTimingStore()
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // Mide cuanto tarda en arrancar la app desde el MainActivity
     fun trackAppStartup(startElapsedRealtimeMs: Long) {
         val durationMs = (android.os.SystemClock.elapsedRealtime() - startElapsedRealtimeMs)
             .coerceAtLeast(0L)
@@ -24,18 +30,13 @@ class PerformanceTracker(
             durationMs = durationMs
         )
     }
-    /*
- * Funcion para trackear la BQ10.
- * Registra que al usuario le salio el aviso de "Estas en la U".
- */
-    fun trackCampusBannerShown(listingId: Int, sellerId: Int?) {
-        trackEvent(BusinessEventName.CAMPUS_BANNER_SHOWN, listingId, sellerId, null)
-    }
 
+    // Registra cuando picas un boton para ir a otra pantalla
     fun markNavigationStart(fromRoute: String?, toRoute: String) {
         navigationTimingStore.start(fromRoute = fromRoute, toRoute = toRoute)
     }
 
+    // Registra cuando la pantalla ya termino de cargar y se ve
     fun onDestinationDisplayed(route: String?) {
         if (route.isNullOrBlank()) return
         val sample = navigationTimingStore.finish(route) ?: return
@@ -45,51 +46,23 @@ class PerformanceTracker(
         )
     }
 
-    private fun sendPerformanceEvent(
-        eventType: PerformanceEventType,
-        durationMs: Long
-    ) {
+    private fun sendPerformanceEvent(eventType: PerformanceEventType, durationMs: Long) {
         val request = PerformanceTelemetryRequest(
             event_type = eventType.wireValue,
-            device_model = deviceModel(),
+            device_model = "${Build.MANUFACTURER} ${Build.MODEL}",
             platform = "android",
             duration_ms = durationMs,
             os_version = Build.VERSION.RELEASE ?: "unknown",
-            app_version = appVersionName()
+            app_version = "1.0"
         )
 
         scope.launch {
-            runCatching {
+            try {
                 api.sendPerformanceTelemetry(request)
-            }.onSuccess { response ->
-                if (!response.isSuccessful) {
-                    Log.w(TAG, "Performance telemetry failed with HTTP ${response.code()}")
-                }
-            }.onFailure { error ->
-                Log.w(TAG, "Performance telemetry failed", error)
+            } catch (e: Exception) {
+                Log.w("PerformanceTracker", "Fallo el envio de performance")
             }
         }
-    }
-
-    // Avoid direct BuildConfig import: some AGP/Kotlin setups fail to expose it to this source set.
-    private fun appVersionName(): String {
-        return runCatching {
-            val buildConfigClass = Class.forName("com.example.unimarketfrontend.BuildConfig")
-            buildConfigClass.getField("VERSION_NAME").get(null) as? String
-        }.getOrNull().orEmpty().ifBlank { "unknown" }
-    }
-
-    private fun deviceModel(): String {
-        val manufacturer = Build.MANUFACTURER.orEmpty().trim()
-        val model = Build.MODEL.orEmpty().trim()
-        return listOf(manufacturer, model)
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-            .ifBlank { "unknown" }
-    }
-
-    companion object {
-        private const val TAG = "PerformanceTracker"
     }
 }
 
@@ -97,5 +70,4 @@ object PerformanceTrackerProvider {
     val tracker: PerformanceTracker by lazy {
         PerformanceTracker(api = AnalyticsRetrofitInstance.api)
     }
-
 }
