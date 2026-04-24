@@ -1,12 +1,15 @@
 package com.example.unimarketfrontend.model.repository
 
 import com.example.unimarketfrontend.model.local.dao.ListingDao
+import com.example.unimarketfrontend.model.mappers.toEntities
 import com.example.unimarketfrontend.model.mappers.toEntity
 import com.example.unimarketfrontend.model.mappers.toListing
 import com.example.unimarketfrontend.model.network.api.ApiService
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
-import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.listing.*
+import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 
+// Clase para manejar el estado dual (Local y Red) de un producto específico
 data class ListingCacheThenNetworkResult(
     val cached: Listing?,
     val remote: Listing?,
@@ -29,6 +32,7 @@ class ListingRepository(
         }
 
         val remoteListing = response.body()?.firstOrNull { it.id == listingId } ?: return null
+
         listingDao.upsert(remoteListing.toEntity())
         return remoteListing
     }
@@ -50,4 +54,35 @@ class ListingRepository(
             )
         }
     }
+
+
+    suspend fun refreshHomeData(): HomeResponseDto {
+        val remote = api.getHomeRanking()
+        val allRemoteListings = (remote.trending + remote.recent).distinctBy { it.id }
+
+        if (allRemoteListings.isNotEmpty()) {
+            listingDao.upsertAll(allRemoteListings.toEntities())
+        }
+        return remote
+    }
+
+    suspend fun getCachedActiveListings(): List<Listing> {
+        return listingDao.getActive().map { it.toListing() }
+    }
+
+    suspend fun searchListings() = api.getListings()
+
+    suspend fun getSellerInfo(sellerId: Int) = api.getUserById(sellerId)
+
+    suspend fun getReviews(listingId: Int) = api.getReviewsByListing(listingId)
+
+    suspend fun getMyListings() = api.getMyListings()
+
+    suspend fun createListing(request: CreateListingRequest) = api.createListing(request)
+
+    suspend fun addListingImage(listingId: Int, request: AddImageRequest) =
+        api.addListingImage(listingId, request)
+
+    suspend fun getCloudinarySignature(request: CloudinarySignatureRequest) =
+        api.getCloudinarySignature(request)
 }
