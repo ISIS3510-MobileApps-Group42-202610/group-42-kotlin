@@ -2,15 +2,17 @@ package com.example.unimarketfrontend.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Purchase
+import com.example.unimarketfrontend.model.repository.AuthRepository
 import com.example.unimarketfrontend.model.user.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class ProfileViewModel : ViewModel() {
+
+    private val authRepository = AuthRepository()
 
     private val _user      = MutableStateFlow<User?>(null)
     val user: StateFlow<User?> = _user
@@ -37,22 +39,22 @@ class ProfileViewModel : ViewModel() {
             _isLoading.value = true
             _errorMsg.value  = null
             try {
-                _user.value = RetrofitInstance.api.getMe()
+                _user.value = authRepository.getMyProfile()
             } catch (e: Exception) {
                 _errorMsg.value = "Error getting user: ${e.message}"
             }
             try {
-                _wishlist.value = RetrofitInstance.api.getWishlist()
+                _wishlist.value = authRepository.getWishlist()
             } catch (e: Exception) {
 
             }
             try {
-                val response = RetrofitInstance.api.getPurchases()
+                val response = authRepository.getPurchases()
                 _purchases.value = response.purchases ?: emptyList()
             } catch (e: Exception) {
             }
             try {
-                _following.value = RetrofitInstance.api.getFollowing()
+                _following.value = authRepository.getFollowing()
             } catch (e: Exception) {
             }
             _isLoading.value = false
@@ -62,7 +64,7 @@ class ProfileViewModel : ViewModel() {
     fun removeFromWishlist(listingId: Int) {
         viewModelScope.launch {
             try {
-                RetrofitInstance.api.removeFromWishlist(listingId)
+                authRepository.removeFromWishlist(listingId)
                 _wishlist.value = _wishlist.value.filter { it.id != listingId }
             } catch (e: Exception) {
                 _errorMsg.value = "Error trying to delete from wishlist"
@@ -71,7 +73,7 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun logout(onSuccess: () -> Unit) {
-        RetrofitInstance.clearToken()
+        authRepository.logout()
         onSuccess()
     }
 
@@ -79,8 +81,8 @@ class ProfileViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val userId = _user.value?.id ?: return@launch
-                RetrofitInstance.api.deleteAccount(userId)
-                RetrofitInstance.clearToken()
+                authRepository.deleteAccount(userId)
+                authRepository.logout()
                 onSuccess()
             } catch (e: Exception) {
                 onError("Error al eliminar cuenta: ${e.message}")

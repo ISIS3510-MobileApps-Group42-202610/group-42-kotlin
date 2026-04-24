@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.auth.ForgotPasswordRequest
 import com.example.unimarketfrontend.model.auth.ResetPasswordRequest
+import com.example.unimarketfrontend.model.repository.AuthRepository
 import kotlinx.coroutines.launch
 
 class ForgotPasswordViewModel : ViewModel() {
+
+    private var authRepository = AuthRepository()
 
     fun forgotPassword(
         email: String,
@@ -16,7 +19,7 @@ class ForgotPasswordViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
-                RetrofitInstance.api.forgotPassword(ForgotPasswordRequest(email))
+                authRepository.forgotPassword(email)
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Request failed")
@@ -32,12 +35,7 @@ class ForgotPasswordViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
-                RetrofitInstance.api.resetPassword(
-                    ResetPasswordRequest(
-                        token        = token,
-                        new_password = newPassword
-                    )
-                )
+                authRepository.resetPassword(token, newPassword)
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Reset failed")
