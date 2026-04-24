@@ -5,10 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.network.external.CloudinaryUploadService
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 import com.example.unimarketfrontend.model.listing.CreateListingRequest
 import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.local.AppDatabase
+import com.example.unimarketfrontend.model.repository.ListingRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +32,10 @@ data class SmartSuggestion(
 )
 
 class CreateListingViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val listingRepository = ListingRepository(
+        listingDao = AppDatabase.getInstance(application).listingDao()
+    )
 
     private val _state =
         MutableStateFlow<CreateListingState>(CreateListingState.Idle)
@@ -80,7 +85,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     }
                 )
 
-                val createResponse: Response<Listing> = RetrofitInstance.api.createListing(requestWithImages)
+                val createResponse: Response<Listing> = listingRepository.createListing(requestWithImages)
 
                 if (!createResponse.isSuccessful) {
                     _state.value = CreateListingState.Error(
@@ -106,7 +111,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
     private suspend fun uploadImagesToCloudinary(imageUris: List<Uri>): List<String> {
         val signatureResponse = withContext(Dispatchers.IO) {
-            RetrofitInstance.api.getCloudinarySignature(
+            listingRepository.getCloudinarySignature(
                 CloudinarySignatureRequest(listing_id = 0)  // dummy value para obtener firma
             )
         }
@@ -177,7 +182,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
             else -> {
                 SmartSuggestion(
                     category = "Other",
-                    price = 20000.0,
+                    price = 0.0,
                     description = "Good condition item for university use."
                 )
             }

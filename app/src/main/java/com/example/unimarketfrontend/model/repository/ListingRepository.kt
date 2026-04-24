@@ -7,6 +7,7 @@ import com.example.unimarketfrontend.model.mappers.toListing
 import com.example.unimarketfrontend.model.network.api.ApiService
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.listing.*
+import com.example.unimarketfrontend.model.message.SendMessageRequest
 import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 
 // Clase para manejar el estado dual (Local y Red) de un producto específico
@@ -75,6 +76,8 @@ class ListingRepository(
     suspend fun getSellerInfo(sellerId: Int) = api.getUserById(sellerId)
 
     suspend fun getReviews(listingId: Int) = api.getReviewsByListing(listingId)
+
+    suspend fun sendMessage(sellerId: Int, content: String) = api.sendMessageAsBuyer(SendMessageRequest(seller_id = sellerId, content = content))
 
     suspend fun getMyListings() = api.getMyListings()
 

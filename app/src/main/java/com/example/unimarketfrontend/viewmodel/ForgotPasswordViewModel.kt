@@ -2,9 +2,6 @@ package com.example.unimarketfrontend.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
-import com.example.unimarketfrontend.model.auth.ForgotPasswordRequest
-import com.example.unimarketfrontend.model.auth.ResetPasswordRequest
 import com.example.unimarketfrontend.model.repository.AuthRepository
 import kotlinx.coroutines.launch
 

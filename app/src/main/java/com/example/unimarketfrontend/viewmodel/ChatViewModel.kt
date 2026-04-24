@@ -10,7 +10,7 @@ import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.message.Message
 import com.example.unimarketfrontend.model.message.SendMessageRequest
-import com.example.unimarketfrontend.model.repository.MessagesRepository
+import com.example.unimarketfrontend.repository.MessagesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 /*
  * ViewModel para la pantalla de chat individual.
  * SPRINT 3: Ahora es un AndroidViewModel para acceder al contexto y usar Room.
- * Implementamos Conectividad Eventual: si el usuario manda un mensaje sin red, 
+ * Implementamos Conectividad Eventual: si el usuario manda un mensaje sin red,
  * se guarda localmente y se marca como [Pending].
  */
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -41,7 +41,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // SPRINT 3: Podríamos implementar cache de mensajes por hilo aquí también.
                 val thread = RetrofitInstance.api.getThread(sellerId)
                 _messages.value = thread
-                
+
                 // BQ4: Tiempo de respuesta (Smart Feature)
                 computeAndLogResponseTime(thread, sellerId)
             } catch (e: Exception) {
@@ -54,7 +54,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun sendMessage(sellerId: Int, content: String) {
         viewModelScope.launch {
             _isSending.value = true
-            
+
             // Verificamos si hay internet usando nuestro Monitor (Sensor de red)
             val isOnline = ConnectivityMonitor.isOnline.value
 
@@ -67,7 +67,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     _messages.value = _messages.value + response
                     AnalyticsLogger.log("message_sent", mapOf("seller_id" to sellerId.toString()))
                 } catch (e: Exception) {
-                    // Si falla el servidor pero el monitor decía que había red, 
+                    // Si falla el servidor pero el monitor decía que había red,
                     // lo mandamos a la cola de pendientes para no perder el dato (Evita UC)
                     Log.w("CHAT_VM", "Fallo envio con red, guardando pendiente")
                     saveLocally(sellerId, content)
@@ -76,7 +76,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // SPRINT 3: Sin red, directo a la base de datos local (Room)
                 saveLocally(sellerId, content)
             }
-            
+
             _isSending.value = false
         }
     }
@@ -84,7 +84,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     // Guarda el mensaje en Room y lo muestra en la UI con tag de pendiente
     private suspend fun saveLocally(sellerId: Int, content: String) {
         repository.savePendingMessage(sellerId, content)
-        
+
         // Creamos un mensaje "ficticio" para que el usuario lo vea de una vez (Feedback inmediato)
         val tempMessage = Message(
             id = -1,
@@ -115,7 +115,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 .mapNotNull { parseMillis(it.created_at) }
                 .filter { it > sentAt } // Buscamos la respuesta inmediata posterior
                 .minOrNull() ?: continue
-            
+
             responseTimes.add((firstReply - sentAt) / 60_000) // Diferencia en minutos
         }
 
@@ -144,7 +144,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val day = dateParts[2].toInt()
             val hour = timeParts[0].toInt()
             val min = timeParts[1].toInt()
-            
+
             ((year - 1970).toLong() * 365 * 24 * 3600 * 1000) +
                     (month.toLong() * 30 * 24 * 3600 * 1000) +
                     (day.toLong() * 24 * 3600 * 1000) +

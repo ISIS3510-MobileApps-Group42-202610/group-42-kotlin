@@ -1,8 +1,10 @@
 package com.example.unimarketfrontend.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.local.AppDatabase
+import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.listing.Listing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -10,7 +12,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class SearchViewModel : ViewModel() {
+class SearchViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = ListingRepository(
+        listingDao = AppDatabase.getInstance(application).listingDao()
+    )
+
 //LISTINGS ACTÚA CÓMO UN CACHE LOCAL PARA QUE SE PUEDA BUSCAR Y NO SATURE EL SERVER
 
     private val _query = MutableStateFlow("")
@@ -43,7 +50,7 @@ class SearchViewModel : ViewModel() {
     private fun fetchAllListings() {
         viewModelScope.launch {
             try {
-                allListings = RetrofitInstance.api.getListings().body() ?: emptyList()
+                allListings = repository.searchListings().body() ?: emptyList()
             } catch (e: Exception) {
                 allListings = emptyList()
             }
@@ -68,9 +75,7 @@ class SearchViewModel : ViewModel() {
     private fun filterListings(query: String): List<Listing> {
         val lower = query.lowercase()
         return allListings.filter { listing ->
-            listing.title.lowercase().contains(lower) ||
-                    listing.category?.lowercase()?.contains(lower) == true ||
-                    listing.condition?.lowercase()?.contains(lower) == true
+            listing.title.lowercase().contains(lower)
         }
     }
 }

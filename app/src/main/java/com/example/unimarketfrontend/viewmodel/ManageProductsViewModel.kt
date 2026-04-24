@@ -1,8 +1,10 @@
 package com.example.unimarketfrontend.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.local.AppDatabase
+import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.listing.Listing
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +19,11 @@ sealed class ManageProductsState {
     data class Error(val message: String) : ManageProductsState()
 }
 
-class ManageProductsViewModel : ViewModel() {
+class ManageProductsViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = ListingRepository(
+        listingDao = AppDatabase.getInstance(application).listingDao()
+    )
 
     private val _state =
         MutableStateFlow<ManageProductsState>(ManageProductsState.Loading)
@@ -33,7 +39,7 @@ class ManageProductsViewModel : ViewModel() {
             try {
 
                 val response =
-                    RetrofitInstance.api.getMyListings()
+                    repository.getMyListings()
 
                 if (response.isSuccessful) {
 
