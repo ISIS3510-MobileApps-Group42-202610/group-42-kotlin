@@ -8,8 +8,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.unimarketfrontend.analytics.PerformanceTrackerProvider
-import com.example.unimarketfrontend.network.RetrofitInstance
+import com.example.unimarketfrontend.utils.analytics.PerformanceTrackerProvider
+import com.example.unimarketfrontend.network.client.RetrofitInstance
 import com.example.unimarketfrontend.ui.screens.ChatScreen
 import com.example.unimarketfrontend.ui.screens.CreateListingScreen
 import com.example.unimarketfrontend.ui.screens.ForgotPasswordScreen

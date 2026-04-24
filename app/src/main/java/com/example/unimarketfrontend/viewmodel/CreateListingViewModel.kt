@@ -4,11 +4,11 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.network.CloudinaryUploadService
-import com.example.unimarketfrontend.network.RetrofitInstance
-import com.example.unimarketfrontend.network.model.CloudinarySignatureRequest
-import com.example.unimarketfrontend.network.model.CreateListingRequest
-import com.example.unimarketfrontend.network.model.Listing
+import com.example.unimarketfrontend.network.external.CloudinaryUploadService
+import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
+import com.example.unimarketfrontend.model.listing.CreateListingRequest
+import com.example.unimarketfrontend.model.listing.Listing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

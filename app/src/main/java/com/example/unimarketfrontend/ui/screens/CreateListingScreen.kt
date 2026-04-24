@@ -56,9 +56,9 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.unimarketfrontend.network.model.CreateListingRequest
-import com.example.unimarketfrontend.network.model.ListingCategory
-import com.example.unimarketfrontend.network.model.ListingCondition
+import com.example.unimarketfrontend.model.listing.CreateListingRequest
+import com.example.unimarketfrontend.model.listing.ListingCategory
+import com.example.unimarketfrontend.model.listing.ListingCondition
 import com.example.unimarketfrontend.ui.components.AccentButton
 import com.example.unimarketfrontend.ui.components.NeumorphicTextField
 import com.example.unimarketfrontend.ui.theme.BackgroundLight

@@ -1,10 +1,10 @@
 package com.example.unimarketfrontend.repository
 
 import com.example.unimarketfrontend.local.dao.MessagesDao
-import com.example.unimarketfrontend.local.entity.ConversationEntity
-import com.example.unimarketfrontend.local.entity.PendingMessageEntity
-import com.example.unimarketfrontend.network.RetrofitInstance
-import com.example.unimarketfrontend.network.model.SendMessageRequest
+import com.example.unimarketfrontend.model.local.ConversationEntity
+import com.example.unimarketfrontend.model.local.PendingMessageEntity
+import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.message.SendMessageRequest
 import kotlinx.coroutines.flow.Flow
 
 /*

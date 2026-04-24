@@ -3,12 +3,11 @@ package com.example.unimarketfrontend.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.analytics.AnalyticsLogger
-import com.example.unimarketfrontend.local.db.AppDatabase
-import com.example.unimarketfrontend.local.entity.ConversationEntity
-import com.example.unimarketfrontend.network.ConnectivityMonitor
+import com.example.unimarketfrontend.utils.analytics.AnalyticsLogger
+import com.example.unimarketfrontend.local.AppDatabase
+import com.example.unimarketfrontend.model.local.ConversationEntity
+import com.example.unimarketfrontend.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.repository.MessagesRepository
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest

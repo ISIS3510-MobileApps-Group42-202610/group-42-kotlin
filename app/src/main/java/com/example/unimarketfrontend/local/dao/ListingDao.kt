@@ -3,7 +3,7 @@ package com.example.unimarketfrontend.local.dao
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
-import com.example.unimarketfrontend.local.entity.ListingEntity
+import com.example.unimarketfrontend.model.local.ListingEntity
 
 @Dao
 interface ListingDao {

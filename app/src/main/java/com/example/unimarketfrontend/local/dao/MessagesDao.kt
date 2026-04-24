@@ -1,8 +1,8 @@
 package com.example.unimarketfrontend.local.dao
 
 import androidx.room.*
-import com.example.unimarketfrontend.local.entity.ConversationEntity
-import com.example.unimarketfrontend.local.entity.PendingMessageEntity
+import com.example.unimarketfrontend.model.local.ConversationEntity
+import com.example.unimarketfrontend.model.local.PendingMessageEntity
 import kotlinx.coroutines.flow.Flow
 
 /*

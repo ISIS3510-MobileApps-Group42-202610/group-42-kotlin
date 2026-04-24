@@ -19,7 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.unimarketfrontend.location.LocationHelper
+import com.example.unimarketfrontend.repository.BusinessAnalyticsProvider
+import com.example.unimarketfrontend.utils.LocationHelper
 import com.example.unimarketfrontend.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
 
@@ -75,7 +76,7 @@ fun ChatScreen(
             // SPRINT 3 - BQ10: Si el sensor dice que estamos en la U, registramos el evento.
             // Esto sirve para ver si la sugerencia de sitio de encuentro aumenta las ventas.
             if (isOnCampus) {
-                com.example.unimarketfrontend.analytics.BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
+                BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
                     listingId = -1, // No tenemos el listing aca, mandamos -1 por ahora
                     sellerId = sellerId
                 )

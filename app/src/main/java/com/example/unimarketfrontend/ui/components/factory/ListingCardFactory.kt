@@ -1,6 +1,6 @@
 package com.example.unimarketfrontend.ui.components.factory
 
-import com.example.unimarketfrontend.network.model.Listing
+import com.example.unimarketfrontend.model.listing.Listing
 
 interface ListingCardPresentation {
     val imageUrl: String

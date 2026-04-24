@@ -2,8 +2,8 @@ package com.example.unimarketfrontend.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.network.RetrofitInstance
-import com.example.unimarketfrontend.network.model.RegisterRequest
+import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.auth.RegisterRequest
 import kotlinx.coroutines.launch
 
 class RegisterViewModel : ViewModel() {

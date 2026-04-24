@@ -23,9 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.unimarketfrontend.network.model.Listing
-import com.example.unimarketfrontend.network.model.Purchase
-import com.example.unimarketfrontend.network.model.User
+import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.listing.Purchase
+import com.example.unimarketfrontend.model.user.User
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.viewmodel.ProfileViewModel

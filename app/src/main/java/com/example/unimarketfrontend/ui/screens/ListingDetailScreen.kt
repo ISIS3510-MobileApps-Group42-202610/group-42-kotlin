@@ -32,7 +32,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -55,8 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.unimarketfrontend.network.model.Review
-import com.example.unimarketfrontend.network.model.User
+import com.example.unimarketfrontend.model.listing.Review
+import com.example.unimarketfrontend.model.user.User
 import com.example.unimarketfrontend.viewmodel.ListingDetailUiState
 import com.example.unimarketfrontend.viewmodel.ListingDetailViewModel
 import com.example.unimarketfrontend.viewmodel.ListingDetailViewModelFactory

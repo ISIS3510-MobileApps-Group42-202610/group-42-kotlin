@@ -1,11 +1,11 @@
 package com.example.unimarketfrontend.repository
 
 import com.example.unimarketfrontend.local.dao.ListingDao
-import com.example.unimarketfrontend.local.entity.toEntity
-import com.example.unimarketfrontend.local.entity.toListing
-import com.example.unimarketfrontend.network.ApiService
-import com.example.unimarketfrontend.network.RetrofitInstance
-import com.example.unimarketfrontend.network.model.Listing
+import com.example.unimarketfrontend.model.mappers.toEntity
+import com.example.unimarketfrontend.model.mappers.toListing
+import com.example.unimarketfrontend.network.api.ApiService
+import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.listing.Listing
 
 data class ListingCacheThenNetworkResult(
     val cached: Listing?,

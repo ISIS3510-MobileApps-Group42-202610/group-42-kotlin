@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.unimarketfrontend.network.model.Listing
+import com.example.unimarketfrontend.model.listing.Listing
 
 @Composable
 fun RecentlyAddedCard(listing: Listing, onClick: () -> Unit = {}) {
