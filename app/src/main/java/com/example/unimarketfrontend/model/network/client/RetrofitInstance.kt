@@ -1,9 +1,9 @@
-package com.example.unimarketfrontend.network.client
+package com.example.unimarketfrontend.model.network.client
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.unimarketfrontend.network.interceptor.AuthInterceptor
-import com.example.unimarketfrontend.network.api.ApiService
+import com.example.unimarketfrontend.model.network.interceptor.AuthInterceptor
+import com.example.unimarketfrontend.model.network.api.ApiService
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

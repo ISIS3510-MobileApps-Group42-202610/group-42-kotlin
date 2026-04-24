@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
-import com.example.unimarketfrontend.utils.analytics.PerformanceTrackerProvider
-import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.utils.analytics.PerformanceTrackerProvider
+import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.ui.navigation.AppNavigation
 
 @Composable

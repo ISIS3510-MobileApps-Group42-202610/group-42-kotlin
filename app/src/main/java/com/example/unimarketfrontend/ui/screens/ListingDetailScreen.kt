@@ -77,7 +77,6 @@ fun ListingDetailScreen(
     val state by vm.uiState.collectAsState()
     var showMessageDialog by remember { mutableStateOf(false) }
     var messageText by remember { mutableStateOf("") }
-    var transactionTracked by remember { mutableStateOf(false) }
 
     when (val current = state) {
         is ListingDetailUiState.Loading -> {

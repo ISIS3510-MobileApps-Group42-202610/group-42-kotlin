@@ -1,4 +1,4 @@
-package com.example.unimarketfrontend.utils
+package com.example.unimarketfrontend.model.utils
 
 import android.content.Context
 import android.net.ConnectivityManager

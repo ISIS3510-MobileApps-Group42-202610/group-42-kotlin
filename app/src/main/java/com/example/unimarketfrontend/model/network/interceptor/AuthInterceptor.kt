@@ -1,4 +1,4 @@
-package com.example.unimarketfrontend.network.interceptor
+package com.example.unimarketfrontend.model.network.interceptor
 
 import okhttp3.Interceptor
 import okhttp3.Response

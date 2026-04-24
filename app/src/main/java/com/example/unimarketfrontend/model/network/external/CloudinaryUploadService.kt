@@ -1,4 +1,4 @@
-package com.example.unimarketfrontend.network.external
+package com.example.unimarketfrontend.model.network.external
 
 import android.content.ContentResolver
 import android.net.Uri

@@ -1,9 +1,9 @@
-package com.example.unimarketfrontend.network.client
+package com.example.unimarketfrontend.model.network.client
 
 import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceTelemetryRequest
-import com.example.unimarketfrontend.network.interceptor.AnalyticsAuthInterceptor
+import com.example.unimarketfrontend.model.network.interceptor.AnalyticsAuthInterceptor
 import com.example.unimarketfrontend.network.model.AnalyticsEvent
 import okhttp3.OkHttpClient
 import retrofit2.Response

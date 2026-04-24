@@ -1,6 +1,6 @@
-package com.example.unimarketfrontend.utils.analytics
+package com.example.unimarketfrontend.model.utils.analytics
 
-import com.example.unimarketfrontend.network.client.AnalyticsRetrofitInstance
+import com.example.unimarketfrontend.model.network.client.AnalyticsRetrofitInstance
 import com.example.unimarketfrontend.network.model.AnalyticsEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

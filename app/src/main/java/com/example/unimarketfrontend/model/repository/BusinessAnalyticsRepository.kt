@@ -1,13 +1,13 @@
-package com.example.unimarketfrontend.repository
+package com.example.unimarketfrontend.model.repository
 
-import com.example.unimarketfrontend.utils.analytics.AnalyticsConfig
+import com.example.unimarketfrontend.model.utils.analytics.AnalyticsConfig
 import com.example.unimarketfrontend.model.analytics.BusinessEventName
 import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceEventRequest
-import com.example.unimarketfrontend.network.api.ApiService
-import com.example.unimarketfrontend.network.client.RetrofitInstance
-import com.example.unimarketfrontend.network.api.AnalyticsApiService
-import com.example.unimarketfrontend.network.interceptor.AnalyticsAuthInterceptor
+import com.example.unimarketfrontend.model.network.api.ApiService
+import com.example.unimarketfrontend.model.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.network.api.AnalyticsApiService
+import com.example.unimarketfrontend.model.network.interceptor.AnalyticsAuthInterceptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

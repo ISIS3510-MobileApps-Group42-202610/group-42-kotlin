@@ -1,14 +1,11 @@
-package com.example.unimarketfrontend.local
+package com.example.unimarketfrontend.model.local
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.example.unimarketfrontend.local.dao.ListingDao
-import com.example.unimarketfrontend.local.dao.MessagesDao
-import com.example.unimarketfrontend.model.local.ConversationEntity
-import com.example.unimarketfrontend.model.local.ListingEntity
-import com.example.unimarketfrontend.model.local.PendingMessageEntity
+import com.example.unimarketfrontend.model.local.dao.ListingDao
+import com.example.unimarketfrontend.model.local.dao.MessagesDao
 
 /*
  * Esta es la base de datos principal de la app usando Room.

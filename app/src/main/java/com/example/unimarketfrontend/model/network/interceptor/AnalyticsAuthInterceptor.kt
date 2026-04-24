@@ -1,7 +1,7 @@
-package com.example.unimarketfrontend.network.interceptor
+package com.example.unimarketfrontend.model.network.interceptor
 
-import com.example.unimarketfrontend.utils.analytics.AnalyticsAuthMode
-import com.example.unimarketfrontend.utils.analytics.AnalyticsConfig
+import com.example.unimarketfrontend.model.utils.analytics.AnalyticsAuthMode
+import com.example.unimarketfrontend.model.utils.analytics.AnalyticsConfig
 import okhttp3.Interceptor
 import okhttp3.Response
 

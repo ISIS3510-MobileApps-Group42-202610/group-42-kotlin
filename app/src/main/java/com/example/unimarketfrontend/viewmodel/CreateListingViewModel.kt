@@ -4,8 +4,8 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.network.external.CloudinaryUploadService
-import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.network.external.CloudinaryUploadService
+import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 import com.example.unimarketfrontend.model.listing.CreateListingRequest
 import com.example.unimarketfrontend.model.listing.Listing

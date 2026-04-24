@@ -1,4 +1,4 @@
-package com.example.unimarketfrontend.utils.analytics
+package com.example.unimarketfrontend.model.utils.analytics
 
 // Modelo de configuración para el analytics engine
 object AnalyticsConfig {

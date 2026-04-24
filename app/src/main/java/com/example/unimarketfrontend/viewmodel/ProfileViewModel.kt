@@ -2,7 +2,7 @@ package com.example.unimarketfrontend.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Purchase
 import com.example.unimarketfrontend.model.user.User

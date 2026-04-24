@@ -19,8 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.unimarketfrontend.repository.BusinessAnalyticsProvider
-import com.example.unimarketfrontend.utils.LocationHelper
+import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
+import com.example.unimarketfrontend.model.utils.LocationHelper
 import com.example.unimarketfrontend.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
 

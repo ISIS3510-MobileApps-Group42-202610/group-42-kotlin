@@ -1,4 +1,4 @@
-package com.example.unimarketfrontend.local.dao
+package com.example.unimarketfrontend.model.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query

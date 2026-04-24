@@ -3,11 +3,11 @@ package com.example.unimarketfrontend.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.local.AppDatabase
-import com.example.unimarketfrontend.utils.ConnectivityMonitor
-import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.local.AppDatabase
+import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
+import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.listing.Listing
-import com.example.unimarketfrontend.repository.HomeRepository
+import com.example.unimarketfrontend.model.repository.HomeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch

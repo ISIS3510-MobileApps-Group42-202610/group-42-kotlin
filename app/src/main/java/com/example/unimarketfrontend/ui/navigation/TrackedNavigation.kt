@@ -2,7 +2,7 @@ package com.example.unimarketfrontend.ui.navigation
 
 import androidx.navigation.NavController
 import androidx.navigation.NavOptionsBuilder
-import com.example.unimarketfrontend.utils.analytics.PerformanceTrackerProvider
+import com.example.unimarketfrontend.model.utils.analytics.PerformanceTrackerProvider
 
 fun NavController.navigateTracked(
     targetRoute: String,

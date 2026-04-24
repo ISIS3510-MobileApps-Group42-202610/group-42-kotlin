@@ -1,4 +1,4 @@
-package com.example.unimarketfrontend.network.api
+package com.example.unimarketfrontend.model.network.api
 
 import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceEventRequest

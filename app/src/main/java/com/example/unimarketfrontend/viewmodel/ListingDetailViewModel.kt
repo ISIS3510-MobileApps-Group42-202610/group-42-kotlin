@@ -4,14 +4,14 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.local.AppDatabase
-import com.example.unimarketfrontend.utils.ConnectivityMonitor
-import com.example.unimarketfrontend.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.local.AppDatabase
+import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
+import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Review
 import com.example.unimarketfrontend.model.message.SendMessageRequest
 import com.example.unimarketfrontend.model.user.User
-import com.example.unimarketfrontend.repository.ListingRepository
+import com.example.unimarketfrontend.model.repository.ListingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -62,7 +62,7 @@ class ListingDetailViewModel(
     private fun loadListing(forceLoading: Boolean = true) {
         if (isLoadingListing) return
         isLoadingListing = true
-        val startMs = System.currentTimeMillis()
+        System.currentTimeMillis()
 
         viewModelScope.launch {
             if (forceLoading && _uiState.value !is ListingDetailUiState.Success) {
