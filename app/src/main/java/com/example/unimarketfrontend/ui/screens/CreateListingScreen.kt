@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -45,6 +46,7 @@ import com.example.unimarketfrontend.ui.components.NeumorphicTextField
 import com.example.unimarketfrontend.ui.theme.*
 import com.example.unimarketfrontend.viewmodel.CreateListingState
 import com.example.unimarketfrontend.viewmodel.CreateListingViewModel
+import kotlinx.coroutines.delay
 import java.io.File
 
 private const val MAX_IMAGES_PER_LISTING = 8
@@ -74,6 +76,10 @@ fun CreateListingScreen(
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     val selectedCondition = remember { mutableStateOf(ListingCondition.NEW) }
     var selectedCategory by remember { mutableStateOf("Books") }
+
+    var isDraftLoaded by remember { mutableStateOf(false) }
+
+    val isLoading = state is CreateListingState.CreatingListing || state is CreateListingState.UploadingImages
 
     val MAX_TITLE_CHARS = 30
     val MAX_DESC_CHARS = 100
@@ -116,6 +122,30 @@ fun CreateListingScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        val draft = viewModel.loadDraft()
+        if (draft != null) {
+            title = draft.title
+            description = draft.description
+            price = draft.price
+            selectedCategory = draft.category
+            selectedImageUris = draft.imageUris.mapNotNull {
+                try { Uri.parse(it) } catch (e: Exception) { null }
+            }
+            isAutoDescription = false
+            isAutoPrice = false
+            isAutoCategory = false
+        }
+        isDraftLoaded = true
+    }
+
+    LaunchedEffect(title, description, price, selectedCategory, selectedImageUris) {
+        if (isDraftLoaded && !isLoading) {
+            delay(500)
+            viewModel.saveDraft(title, description, price, selectedCategory, selectedImageUris)
+        }
+    }
+
     LaunchedEffect(state) {
         if (state is CreateListingState.Success) {
             navController.popBackStack()
@@ -136,11 +166,29 @@ fun CreateListingScreen(
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                modifier = Modifier.clickable { navController.popBackStack() },
+                modifier = Modifier.clickable(enabled = !isLoading) { navController.popBackStack() },
                 tint = TextPrimary
             )
             Text("Create listing", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-            Box(modifier = Modifier.size(24.dp))
+            IconButton(
+                onClick = {
+                    if (!isLoading) {
+                        viewModel.clearDraft()
+                        title = ""
+                        description = ""
+                        price = ""
+                        selectedCategory = "Books"
+                        selectedImageUris = emptyList()
+                        isAutoDescription = true
+                        isAutoPrice = true
+                        isAutoCategory = true
+                    }
+                },
+                modifier = Modifier.size(24.dp),
+                enabled = !isLoading
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = "Discard Draft", tint = MaterialTheme.colorScheme.error)
+            }
         }
 
         Column(
@@ -155,7 +203,7 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = title,
                 onValueChange = {
-                    if (it.length <= MAX_TITLE_CHARS) {
+                    if (!isLoading && it.length <= MAX_TITLE_CHARS) {
                         title = it
                         localError = null
                         if (it.length >= 3) {
@@ -174,7 +222,7 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = description,
                 onValueChange = {
-                    if (it.length <= MAX_DESC_CHARS) {
+                    if (!isLoading && it.length <= MAX_DESC_CHARS) {
                         description = it
                         isAutoDescription = false
                     }
@@ -187,11 +235,13 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = price,
                 onValueChange = {
-                    val inputPrice = it.toDoubleOrNull()
-                    if (it.isEmpty() || (inputPrice != null && inputPrice <= MAX_PRICE)) {
-                        price = it
-                        localError = null
-                        isAutoPrice = false
+                    if (!isLoading) {
+                        val inputPrice = it.toDoubleOrNull()
+                        if (it.isEmpty() || (inputPrice != null && inputPrice <= MAX_PRICE)) {
+                            price = it
+                            localError = null
+                            isAutoPrice = false
+                        }
                     }
                 },
                 label = "Price (Max 25M)",
@@ -209,7 +259,7 @@ fun CreateListingScreen(
                             .height(40.dp)
                             .shadow(4.dp, RoundedCornerShape(12.dp), ambientColor = Color.Black.copy(alpha = 0.08f))
                             .background(if (selectedCategory == cat) PrimaryIndigo else Color(0xFFDDF3F0), RoundedCornerShape(12.dp))
-                            .clickable {
+                            .clickable(enabled = !isLoading) {
                                 selectedCategory = cat
                                 isAutoCategory = false
                             }
@@ -227,7 +277,7 @@ fun CreateListingScreen(
                     .height(100.dp)
                     .shadow(4.dp, RoundedCornerShape(14.dp), ambientColor = Color.Black.copy(alpha = 0.08f))
                     .background(Color.White, RoundedCornerShape(14.dp))
-                    .clickable { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    .clickable(enabled = !isLoading) { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -249,8 +299,13 @@ fun CreateListingScreen(
                                 contentScale = ContentScale.Crop
                             )
                             IconButton(
-                                onClick = { selectedImageUris = selectedImageUris.filterNot { it == uri } },
-                                modifier = Modifier.align(Alignment.TopEnd)
+                                onClick = {
+                                    if (!isLoading) {
+                                        selectedImageUris = selectedImageUris.filterNot { it == uri }
+                                    }
+                                },
+                                modifier = Modifier.align(Alignment.TopEnd),
+                                enabled = !isLoading
                             ) {
                                 Icon(Icons.Default.Star, contentDescription = null, tint = SecondaryEmerald)
                             }
@@ -262,6 +317,7 @@ fun CreateListingScreen(
             AccentButton(
                 text = "Publish",
                 onClick = {
+                    if (isLoading) return@AccentButton
                     val p = price.toDoubleOrNull()
                     when {
                         title.isBlank() -> localError = "Title is required"
@@ -288,13 +344,13 @@ fun CreateListingScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 Box(
                     modifier = Modifier.weight(1f).height(42.dp).background(Color.White, RoundedCornerShape(12.dp))
-                        .clickable { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                        .clickable(enabled = !isLoading) { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     contentAlignment = Alignment.Center
                 ) { Text("Gallery", color = TextPrimary) }
 
                 Box(
                     modifier = Modifier.weight(1f).height(42.dp).background(Color.White, RoundedCornerShape(12.dp))
-                        .clickable {
+                        .clickable(enabled = !isLoading) {
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                                 val uri = createTempImageUri(context)
                                 pendingCameraUri = uri
@@ -335,6 +391,26 @@ fun CreateListingScreen(
                                 modifier = Modifier.padding(top = 4.dp, start = 30.dp)
                             )
                         }
+                    }
+                }
+                is CreateListingState.PendingRetry -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                            .background(Color(0xFFFFF3E0), RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            "Sin conexión a internet.",
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE65100)
+                        )
+                        Text(
+                            "Tu borrador está guardado. Intenta publicar de nuevo cuando tengas señal.",
+                            fontSize = 12.sp,
+                            color = Color(0xFFE65100)
+                        )
                     }
                 }
                 is CreateListingState.Error -> {

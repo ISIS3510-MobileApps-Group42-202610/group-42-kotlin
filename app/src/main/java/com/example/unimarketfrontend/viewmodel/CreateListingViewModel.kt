@@ -1,6 +1,9 @@
 package com.example.unimarketfrontend.viewmodel
 
 import android.app.Application
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,16 +13,12 @@ import com.example.unimarketfrontend.model.listing.CreateListingRequest
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.repository.ListingRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import retrofit2.Response
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicInteger
 
 sealed class CreateListingState {
@@ -27,6 +26,7 @@ sealed class CreateListingState {
     object CreatingListing : CreateListingState()
     data class UploadingImages(val uploaded: Int, val total: Int, val retryMessage: String? = null) : CreateListingState()
     object Success : CreateListingState()
+    object PendingRetry : CreateListingState()
     data class Error(val message: String) : CreateListingState()
 }
 
@@ -36,16 +36,54 @@ data class SmartSuggestion(
     val description: String
 )
 
+data class DraftListing(
+    val title: String,
+    val description: String,
+    val price: String,
+    val category: String,
+    val imageUris: List<String>
+)
+
 class CreateListingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val listingRepository = ListingRepository(
         listingDao = AppDatabase.getInstance(application).listingDao()
     )
 
-    private val _state =
-        MutableStateFlow<CreateListingState>(CreateListingState.Idle)
+    private val prefs = application.getSharedPreferences("listing_draft", Context.MODE_PRIVATE)
 
+    private val _state = MutableStateFlow<CreateListingState>(CreateListingState.Idle)
     val state: StateFlow<CreateListingState> = _state
+
+    fun saveDraft(title: String, description: String, price: String, category: String, uris: List<Uri>) {
+        prefs.edit().apply {
+            putString("title", title)
+            putString("description", description)
+            putString("price", price)
+            putString("category", category)
+            putString("uris", uris.joinToString(",") { it.toString() })
+            apply()
+        }
+    }
+
+    fun loadDraft(): DraftListing? {
+        val title = prefs.getString("title", "") ?: ""
+        val description = prefs.getString("description", "") ?: ""
+        val price = prefs.getString("price", "") ?: ""
+        val category = prefs.getString("category", "Books") ?: "Books"
+        val urisRaw = prefs.getString("uris", "") ?: ""
+
+        if (title.isBlank() && description.isBlank() && price.isBlank() && urisRaw.isBlank()) {
+            return null
+        }
+
+        val uris = if (urisRaw.isNotEmpty()) urisRaw.split(",") else emptyList()
+        return DraftListing(title, description, price, category, uris)
+    }
+
+    fun clearDraft() {
+        prefs.edit().clear().apply()
+    }
 
     private fun buildHttpError(context: String, response: Response<*>): String {
         val errorBody = try {
@@ -68,18 +106,61 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         return details
     }
 
+    private suspend fun compressImage(context: Context, uri: Uri): Uri = withContext(Dispatchers.IO) {
+        try {
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, options)
+            }
+
+            var scale = 1
+            while (options.outWidth / scale / 2 >= 1024 && options.outHeight / scale / 2 >= 1024) {
+                scale *= 2
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply {
+                inSampleSize = scale
+            }
+
+            val bitmap = context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, decodeOptions)
+            } ?: return@withContext uri
+
+            val file = File(context.cacheDir, "compressed_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+            }
+            bitmap.recycle()
+
+            Uri.fromFile(file)
+        } catch (e: Exception) {
+            uri
+        }
+    }
+
+    private fun deleteTempFile(uri: Uri) {
+        if (uri.scheme == "file") {
+            uri.path?.let { path ->
+                val file = File(path)
+                if (file.exists()) file.delete()
+            }
+        }
+    }
+
     fun createListing(request: CreateListingRequest, imageUris: List<Uri>) {
+        if (_state.value is CreateListingState.CreatingListing || _state.value is CreateListingState.UploadingImages) return
+
         viewModelScope.launch {
             _state.value = CreateListingState.CreatingListing
 
             try {
-
                 val imageUrls = if (imageUris.isNotEmpty()) {
                     uploadImagesToCloudinary(imageUris)
                 } else {
                     emptyList()
                 }
-
 
                 val requestWithImages = request.copy(
                     images = imageUrls.mapIndexed { index, url ->
@@ -93,30 +174,21 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 val createResponse: Response<Listing> = listingRepository.createListing(requestWithImages)
 
                 if (!createResponse.isSuccessful) {
-                    _state.value = CreateListingState.Error(
-                        buildHttpError("Listing creation", createResponse)
-                    )
+                    handleFailureAsPending()
                     return@launch
                 }
 
-                val listing = createResponse.body()
-                if (listing == null) {
-                    _state.value = CreateListingState.Error("Invalid response when creating listing")
-                    return@launch
-                }
-
-
+                clearDraft()
                 _state.value = CreateListingState.Success
 
             } catch (e: Exception) {
-                val userErrorMessage = when (e) {
-                    is java.net.UnknownHostException -> "No internet connection. Please check your network."
-                    is java.util.concurrent.TimeoutException -> "Upload took too long. Please try again."
-                    else -> e.message ?: "An unexpected error occurred"
-                }
-                _state.value = CreateListingState.Error(userErrorMessage)
+                handleFailureAsPending()
             }
         }
+    }
+
+    private fun handleFailureAsPending() {
+        _state.value = CreateListingState.PendingRetry
     }
 
     private suspend fun uploadImagesToCloudinary(imageUris: List<Uri>): List<String> = coroutineScope {
@@ -133,13 +205,16 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         }
 
         val signature = signatureResponse.body()!!
-        val contentResolver = getApplication<Application>().contentResolver
+        val applicationContext = getApplication<Application>()
+        val contentResolver = applicationContext.contentResolver
 
         val completedUploads = AtomicInteger(0)
         _state.value = CreateListingState.UploadingImages(0, imageUris.size)
 
         val deferredUploads = imageUris.mapIndexed { index, uri ->
             async(Dispatchers.IO) {
+                val compressedUri = compressImage(applicationContext, uri)
+
                 val imageUrl: String = retryIO(
                     times = 3,
                     onRetry = { attempt ->
@@ -152,10 +227,13 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 ) {
                     CloudinaryUploadService.uploadImage(
                         contentResolver = contentResolver,
-                        imageUri = uri,
+                        imageUri = compressedUri,
                         signature = signature
                     )
                 }
+
+                deleteTempFile(compressedUri)
+
                 val currentCompleted = completedUploads.incrementAndGet()
                 _state.value = CreateListingState.UploadingImages(currentCompleted, imageUris.size, null)
                 imageUrl
@@ -197,7 +275,6 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Scientific calculator in good condition"
                 )
             }
-
             lower.contains("book") || lower.contains("calculus") -> {
                 SmartSuggestion(
                     category = "Books",
@@ -205,7 +282,6 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Academic textbook used for courses"
                 )
             }
-
             lower.contains("notes") -> {
                 SmartSuggestion(
                     category = "Notes",
@@ -213,7 +289,6 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Well-organized study notes"
                 )
             }
-
             lower.contains("furniture") -> {
                 SmartSuggestion(
                     category = "Furniture",
@@ -221,7 +296,6 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Comfortable and spacious furniture"
                 )
             }
-
             else -> {
                 SmartSuggestion(
                     category = "Other",

@@ -62,10 +62,6 @@ import com.example.unimarketfrontend.viewmodel.ListingDetailViewModelFactory
 import java.util.Locale
 import kotlin.math.floor
 
-/*
- * Pantalla de detalle del producto - SPRINT 3
- * Corregimos los errores de analiticas y sincronizamos con el nuevo ViewModel.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListingDetailScreen(
@@ -75,8 +71,12 @@ fun ListingDetailScreen(
     val app = LocalContext.current.applicationContext as Application
     val vm: ListingDetailViewModel = viewModel(factory = ListingDetailViewModelFactory(app, listingId))
     val state by vm.uiState.collectAsState()
+
     var showMessageDialog by remember { mutableStateOf(false) }
     var messageText by remember { mutableStateOf("") }
+
+    var showRatingDialog by remember { mutableStateOf(false) }
+    var selectedRating by remember { mutableIntStateOf(5) }
 
     when (val current = state) {
         is ListingDetailUiState.Loading -> {
@@ -133,12 +133,10 @@ fun ListingDetailScreen(
                         TextButton(
                             onClick = {
                                 if (messageText.isNotBlank()) {
-                                    // SPRINT 3: Mandamos el primer mensaje y navegamos
                                     vm.sendFirstMessage(
                                         sellerId = listing.seller_id,
                                         content = messageText,
                                         onComplete = {
-                                            // Al terminar, cerramos y mandamos al chat
                                             showMessageDialog = false
                                             navController.navigate("chat/${listing.seller_id}/${seller?.name ?: "Vendedor"}")
                                         }
@@ -149,6 +147,43 @@ fun ListingDetailScreen(
                     },
                     dismissButton = {
                         TextButton(onClick = { showMessageDialog = false }) { Text("Cancelar") }
+                    }
+                )
+            }
+
+            if (showRatingDialog) {
+                AlertDialog(
+                    onDismissRequest = { showRatingDialog = false },
+                    title = { Text("Finalizar Compra") },
+                    text = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            Text("¿Cómo calificarías la experiencia con este vendedor?")
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                repeat(5) { index ->
+                                    val starIndex = index + 1
+                                    Icon(
+                                        imageVector = if (starIndex <= selectedRating) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clickable { selectedRating = starIndex }
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                vm.trackTransactionCompleted(rating = selectedRating)
+                                showRatingDialog = false
+                            }
+                        ) { Text("Finalizar") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showRatingDialog = false }) { Text("Cancelar") }
                     }
                 )
             }
@@ -174,7 +209,6 @@ fun ListingDetailScreen(
                 ) {
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Carrusel de imagenes
                     if (images.isNotEmpty()) {
                         AsyncImage(
                             model = images[selectedImageIndex].url,
@@ -276,14 +310,25 @@ fun ListingDetailScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Boton para iniciar contacto
                     Button(
                         onClick = {
                             showMessageDialog = true
+                            vm.trackChatStarted()
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Contactar vendedor")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    TextButton(
+                        onClick = {
+                            showRatingDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Marcar como comprado")
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
