@@ -5,8 +5,5 @@ enum class BusinessEventName(val value: String) {
     CHAT_STARTED("chat_started"),
     FIRST_MESSAGE_SENT("first_message_sent"),
     TRANSACTION_COMPLETED("transaction_completed"),
-
     CAMPUS_BANNER_SHOWN("campus_banner_shown")
-
 }
-

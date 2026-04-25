@@ -1,40 +1,41 @@
 package com.example.unimarketfrontend.model.network.client
 
-import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
-import com.example.unimarketfrontend.model.analytics.PerformanceEventRequest
-import com.example.unimarketfrontend.model.analytics.PerformanceTelemetryRequest
+import com.example.unimarketfrontend.model.network.api.AnalyticsApiService
 import com.example.unimarketfrontend.model.network.interceptor.AnalyticsAuthInterceptor
-import com.example.unimarketfrontend.network.model.AnalyticsEvent
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import retrofit2.Response
+import okhttp3.RequestBody.Companion.toRequestBody
+import okio.Buffer
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.Body
-import retrofit2.http.POST
-
-/*
- * Esta es la unica interfaz para hablar con el motor de analytics (Django).
- * Aca centralizamos todos los eventos: negocio, performance y legacy.
- */
-interface AnalyticsApiService {
-    @POST("events")
-    suspend fun logEvent(@Body event: AnalyticsEvent)
-
-    @POST("api/business-events/")
-    suspend fun sendBusinessEvent(@Body request: BusinessEventRequest): Response<Unit>
-
-    @POST("api/performance")
-    suspend fun sendPerformanceEvent(@Body request: PerformanceEventRequest): Response<Unit>
-
-    @POST("api/performance")
-    suspend fun sendPerformanceTelemetry(@Body request: PerformanceTelemetryRequest): Response<Unit>
-}
 
 object AnalyticsRetrofitInstance {
     private const val ANALYTICS_BASE_URL = "https://group-42-analytic-engine-back.vercel.app/"
 
+    private val missingEventTypeFixer = Interceptor { chain ->
+        val request = chain.request()
+        val path = request.url.encodedPath
+
+        if (path.contains("/api/performance") && request.method == "POST") {
+            val body = request.body
+            if (body != null) {
+                val buffer = Buffer()
+                body.writeTo(buffer)
+                val bodyStr = buffer.readUtf8()
+
+                if (bodyStr.startsWith("{") && !bodyStr.contains("\"event_type\"")) {
+                    val newBodyStr = bodyStr.replaceFirst("{", "{\"event_type\":\"performance_metric\",")
+                    val newBody = newBodyStr.toRequestBody(body.contentType())
+                    return@Interceptor chain.proceed(request.newBuilder().post(newBody).build())
+                }
+            }
+        }
+        chain.proceed(request)
+    }
+
     private val client = OkHttpClient.Builder()
         .addInterceptor(AnalyticsAuthInterceptor())
+        .addInterceptor(missingEventTypeFixer)
         .build()
 
     val api: AnalyticsApiService by lazy {
