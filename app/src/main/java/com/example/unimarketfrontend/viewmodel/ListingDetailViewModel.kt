@@ -44,17 +44,6 @@ data class RatingSummaryUi(
     val count: Int
 )
 
-private data class ListingDetailActionState(
-    val sellerDisplayName: String,
-    val contactTargetId: Int?,
-    val contactTargetName: String?,
-    val contactActionLabel: String,
-    val isOwner: Boolean,
-    val canMarkAsSold: Boolean,
-    val hasExternalComments: Boolean,
-    val externalCommentsCount: Int
-)
-
 class ListingDetailViewModel(
     application: Application,
     private val listingId: Int
@@ -323,7 +312,7 @@ class ListingDetailViewModel(
             }
 
             try {
-                val response = RetrofitInstance.api.deleteListing(listingId)
+                val response = repository.deleteListing(listingId)
 
                 if (response.isSuccessful) {
                     onComplete()
@@ -356,7 +345,7 @@ class ListingDetailViewModel(
                     content = cleanContent
                 )
 
-                RetrofitInstance.api.sendMessageAsBuyer(request)
+                repository.sendMessage(request)
                 trackFirstMessageSent(cleanContent.length)
                 onComplete()
 
@@ -375,7 +364,7 @@ class ListingDetailViewModel(
         val listing = state.listing
         val seller = state.seller
 
-        BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
+         BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
             listingId = listing.id,
             sellerId = listing.seller_id,
             metadata = mapOf(
@@ -384,10 +373,10 @@ class ListingDetailViewModel(
                 "product" to (listing.product ?: "unknown"),
                 "selling_price" to listing.selling_price.toString(),
                 "semester" to (seller?.semester?.toString() ?: "unknown"),
-                "seller_id" to listing.seller_id,
-                "rating" to (rating ?: 0),
-                "response_time_minutes" to (responseTimeMinutes ?: 0),
-                "seeded_bq5" to false
+                "seller_id" to listing.seller_id.toString(),
+                "rating" to (rating ?: 0).toString(),
+                "response_time_minutes" to (responseTimeMinutes ?: 0).toString(),
+                "seeded_bq5" to "false"
             )
         )
     }

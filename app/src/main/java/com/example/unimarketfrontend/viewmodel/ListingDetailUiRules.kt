@@ -30,8 +30,6 @@ fun buildListingDetailActionState(
         ?.takeIf { it.isNotBlank() }
         ?: "Usuario #${listing.seller_id}"
 
-    // CORRECCIÓN: Comparamos contra owner_user_id (User ID) y no contra seller_id (Seller ID)
-    // Usamos el ID del objeto 'seller' obtenido o el campo del listing como respaldo
     val sellerActualUserId = listing.owner_user_id ?: seller?.id ?: -1
     val isOwner = currentUser?.id != null && currentUser.id == sellerActualUserId
     
