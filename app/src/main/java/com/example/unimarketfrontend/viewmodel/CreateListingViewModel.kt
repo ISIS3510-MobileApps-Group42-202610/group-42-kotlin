@@ -7,18 +7,28 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.network.external.CloudinaryUploadService
 import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 import com.example.unimarketfrontend.model.listing.CreateListingRequest
 import com.example.unimarketfrontend.model.listing.Listing
-import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.repository.ListingRepository
-import kotlinx.coroutines.*
+import com.example.unimarketfrontend.model.utils.ErrorTranslator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Response
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 
 sealed class CreateListingState {
@@ -34,6 +44,11 @@ data class SmartSuggestion(
     val category: String,
     val price: Double,
     val description: String
+)
+
+data class CourseOption(
+    val id: Int,
+    val name: String
 )
 
 data class DraftListing(
@@ -54,6 +69,27 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
     private val _state = MutableStateFlow<CreateListingState>(CreateListingState.Idle)
     val state: StateFlow<CreateListingState> = _state
+
+    private val _listingCreated = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+    val listingCreated: SharedFlow<Int> = _listingCreated
+
+    private val _courses = MutableStateFlow(
+        listOf(
+            CourseOption(101, "Matematicas I"),
+            CourseOption(102, "Calculo"),
+            CourseOption(103, "Fisica"),
+            CourseOption(104, "Programacion"),
+            CourseOption(105, "Electronica")
+        )
+    )
+    val courses: StateFlow<List<CourseOption>> = _courses
+
+    private val _selectedCourseId = MutableStateFlow<Int?>(null)
+    val selectedCourseId: StateFlow<Int?> = _selectedCourseId
+
+    fun setSelectedCourse(courseId: Int?) {
+        _selectedCourseId.value = courseId
+    }
 
     fun saveDraft(title: String, description: String, price: String, category: String, uris: List<Uri>) {
         prefs.edit().apply {
@@ -92,7 +128,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
             null
         }
 
-        val details = buildString {
+        return buildString {
             append("$context failed")
             append(" (HTTP ${response.code()})")
             if (!response.message().isNullOrBlank()) {
@@ -102,8 +138,6 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 append(" - $errorBody")
             }
         }
-
-        return details
     }
 
     private suspend fun compressImage(context: Context, uri: Uri): Uri = withContext(Dispatchers.IO) {
@@ -111,6 +145,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
             val options = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
+
             context.contentResolver.openInputStream(uri)?.use {
                 BitmapFactory.decodeStream(it, null, options)
             }
@@ -132,10 +167,10 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
             }
-            bitmap.recycle()
 
+            bitmap.recycle()
             Uri.fromFile(file)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             uri
         }
     }
@@ -150,7 +185,9 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun createListing(request: CreateListingRequest, imageUris: List<Uri>) {
-        if (_state.value is CreateListingState.CreatingListing || _state.value is CreateListingState.UploadingImages) return
+        if (_state.value is CreateListingState.CreatingListing || _state.value is CreateListingState.UploadingImages) {
+            return
+        }
 
         viewModelScope.launch {
             _state.value = CreateListingState.CreatingListing
@@ -163,6 +200,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 }
 
                 val requestWithImages = request.copy(
+                    course_id = request.course_id ?: _selectedCourseId.value,
                     images = imageUrls.mapIndexed { index, url ->
                         mapOf(
                             "url" to url,
@@ -178,11 +216,22 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     return@launch
                 }
 
+                val listing = createResponse.body()
+                if (listing == null) {
+                    _state.value = CreateListingState.Error("Respuesta invalida al crear el listing")
+                    return@launch
+                }
+
+                listingRepository.cacheRemoteListings(listOf(listing))
                 clearDraft()
+                _listingCreated.tryEmit(listing.id)
                 _state.value = CreateListingState.Success
 
-            } catch (e: Exception) {
+            } catch (e: IOException) {
                 handleFailureAsPending()
+            } catch (e: Exception) {
+                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
+                _state.value = CreateListingState.Error(userMessage)
             }
         }
     }
@@ -235,7 +284,12 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 deleteTempFile(compressedUri)
 
                 val currentCompleted = completedUploads.incrementAndGet()
-                _state.value = CreateListingState.UploadingImages(currentCompleted, imageUris.size, null)
+                _state.value = CreateListingState.UploadingImages(
+                    currentCompleted,
+                    imageUris.size,
+                    null
+                )
+
                 imageUrl
             }
         }
@@ -252,15 +306,18 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         block: suspend () -> T
     ): T {
         var currentDelay = initialDelay
+
         repeat(times - 1) { attempt ->
             try {
                 return block()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 onRetry(attempt + 1)
             }
+
             delay(currentDelay)
             currentDelay = (currentDelay * factor).toLong().coerceAtMost(maxDelay)
         }
+
         return block()
     }
 
@@ -275,6 +332,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Scientific calculator in good condition"
                 )
             }
+
             lower.contains("book") || lower.contains("calculus") -> {
                 SmartSuggestion(
                     category = "Books",
@@ -282,6 +340,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Academic textbook used for courses"
                 )
             }
+
             lower.contains("notes") -> {
                 SmartSuggestion(
                     category = "Notes",
@@ -289,6 +348,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Well-organized study notes"
                 )
             }
+
             lower.contains("furniture") -> {
                 SmartSuggestion(
                     category = "Furniture",
@@ -296,6 +356,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Comfortable and spacious furniture"
                 )
             }
+
             else -> {
                 SmartSuggestion(
                     category = "Other",

@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.unimarketfrontend.model.listing.Review
 import com.example.unimarketfrontend.model.user.User
+import com.example.unimarketfrontend.ui.navigation.ChatRoutesFactory
 import com.example.unimarketfrontend.viewmodel.ListingDetailUiState
 import com.example.unimarketfrontend.viewmodel.ListingDetailViewModel
 import com.example.unimarketfrontend.viewmodel.ListingDetailViewModelFactory
@@ -74,6 +76,8 @@ fun ListingDetailScreen(
 
     var showMessageDialog by remember { mutableStateOf(false) }
     var messageText by remember { mutableStateOf("") }
+    var messageError by remember { mutableStateOf<String?>(null) }
+    var actionError by remember { mutableStateOf<String?>(null) }
 
     var showRatingDialog by remember { mutableStateOf(false) }
     var selectedRating by remember { mutableIntStateOf(5) }
@@ -112,6 +116,9 @@ fun ListingDetailScreen(
         is ListingDetailUiState.Success -> {
             val listing = current.listing
             val seller = current.seller
+            val contactTargetId = current.contactTargetId
+            val contactTargetName = current.contactTargetName ?: seller?.let { "${it.name} ${it.last_name}".trim() } ?: "Vendedor"
+            val contactActionLabel = current.contactActionLabel
             val reviews = current.reviews
             val ratingSummary = current.ratingSummary
             var selectedImageIndex by remember { mutableIntStateOf(0) }
@@ -119,34 +126,60 @@ fun ListingDetailScreen(
 
             if (showMessageDialog) {
                 AlertDialog(
-                    onDismissRequest = { showMessageDialog = false },
+                    onDismissRequest = {
+                        showMessageDialog = false
+                        messageError = null
+                    },
                     title = { Text("Enviar mensaje") },
                     text = {
-                        OutlinedTextField(
-                            value = messageText,
-                            onValueChange = { messageText = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Mensaje") }
-                        )
+                        Column {
+                            OutlinedTextField(
+                                value = messageText,
+                                onValueChange = {
+                                    messageText = it
+                                    messageError = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Mensaje") }
+                            )
+                            if (!messageError.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = messageError.orEmpty(),
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
                     },
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                if (messageText.isNotBlank()) {
+                                val recipientId = contactTargetId
+                                if (messageText.isNotBlank() && recipientId != null) {
                                     vm.sendFirstMessage(
-                                        sellerId = listing.seller_id,
+                                        recipientUserId = recipientId,
                                         content = messageText,
                                         onComplete = {
                                             showMessageDialog = false
-                                            navController.navigate("chat/${listing.seller_id}/${seller?.name ?: "Vendedor"}")
+                                            messageText = ""
+                                            messageError = null
+                                            navController.navigate(ChatRoutesFactory.chatPath(recipientId, contactTargetName))
+                                        },
+                                        onError = { error ->
+                                            messageError = error
                                         }
                                     )
                                 }
-                            }
+                            },
+                            enabled = contactTargetId != null
                         ) { Text("Enviar") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showMessageDialog = false }) { Text("Cancelar") }
+                        TextButton(onClick = {
+                            showMessageDialog = false
+                            messageError = null
+                        }) { Text("Cancelar") }
                     }
                 )
             }
@@ -254,6 +287,9 @@ fun ListingDetailScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listing.condition?.let { AssistChip(onClick = {}, label = { Text(it) }) }
                         listing.category?.let { AssistChip(onClick = {}, label = { Text(it) }) }
+                        if (!listing.active) {
+                            AssistChip(onClick = {}, label = { Text("Vendida") })
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -262,7 +298,12 @@ fun ListingDetailScreen(
 
                     Text(text = "Vendedor", style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(8.dp))
-                    SellerSection(seller = seller)
+                    SellerSection(seller = seller, fallbackName = current.sellerDisplayName)
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (current.isOwner) {
+                        AssistChip(onClick = {}, label = { Text("Tu publicación") })
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
                     HorizontalDivider()
@@ -277,6 +318,11 @@ fun ListingDetailScreen(
                             text = "${String.format(Locale.US, "%.1f", ratingSummary.average)} (${ratingSummary.count} reviews)",
                             style = MaterialTheme.typography.bodyMedium
                         )
+                    }
+
+                    if (current.hasExternalComments) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        AssistChip(onClick = {}, label = { Text("${current.externalCommentsCount} comentarios de otros usuarios") })
                     }
 
                     val productDescription = listing.product.orEmpty().trim()
@@ -297,7 +343,7 @@ fun ListingDetailScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     if (reviews.isEmpty()) {
                         Text(
-                            text = "Aun no hay reviews para este producto.",
+                            text = "Reviews unavailable offline. Connect to see reviews.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -308,16 +354,51 @@ fun ListingDetailScreen(
                         }
                     }
 
+                    actionError?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Button(
-                        onClick = {
-                            showMessageDialog = true
-                            vm.trackChatStarted()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Contactar vendedor")
+                    if (current.canMarkAsSold) {
+                        Button(
+                            onClick = {
+                                vm.markAsSold(
+                                    onComplete = {
+                                        actionError = null
+                                        navController.popBackStack()
+                                    },
+                                    onError = { error ->
+                                        actionError = error
+                                    }
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Marcar como vendida")
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    // Boton para iniciar contacto
+                    if (contactTargetId != null) {
+                        Button(
+                            onClick = {
+                                showMessageDialog = true
+                                messageError = null
+                                vm.trackChatStarted()
+
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = contactTargetId != null
+                        ) {
+                            Text(contactActionLabel)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -339,11 +420,12 @@ fun ListingDetailScreen(
 }
 
 @Composable
-private fun SellerSection(seller: User?) {
+private fun SellerSection(seller: User?, fallbackName: String) {
     if (seller == null) {
         Text(
-            text = "No se pudo cargar la informacion del vendedor.",
-            style = MaterialTheme.typography.bodyMedium,
+            text = fallbackName,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         return

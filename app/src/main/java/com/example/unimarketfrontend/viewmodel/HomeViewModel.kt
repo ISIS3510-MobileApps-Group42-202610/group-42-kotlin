@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
+import com.example.unimarketfrontend.model.utils.ErrorTranslator
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.repository.HomeRepository
@@ -47,6 +48,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         loadHome()
     }
 
+    fun refreshHome() {
+        loadHome(forceLoading = false)
+    }
+
+    // Escuchamos al monitor de red para saber si volvio el internet
     private fun observeConnectivity() {
         viewModelScope.launch {
             ConnectivityMonitor.isOnline.collect { online ->
@@ -101,8 +107,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 shouldRetryWhenOnline = false
             } catch (e: Exception) {
                 shouldRetryWhenOnline = true
+                // Si Room esta vacio y falla el internet, mostramos error amigable
                 if (cachedListings.isEmpty()) {
-                    _uiState.value = HomeUiState.Error(e.message ?: "No hay conexion a internet")
+                    val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
+                    _uiState.value = HomeUiState.Error(userMessage)
                 }
             } finally {
                 isLoadingHome = false

@@ -21,8 +21,20 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +60,7 @@ import com.example.unimarketfrontend.viewmodel.CreateListingState
 import com.example.unimarketfrontend.viewmodel.CreateListingViewModel
 import kotlinx.coroutines.delay
 import java.io.File
+import kotlinx.coroutines.flow.collectLatest
 
 private const val MAX_IMAGES_PER_LISTING = 8
 
@@ -63,6 +76,8 @@ fun CreateListingScreen(
     viewModel: CreateListingViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val courses by viewModel.courses.collectAsState()
+    val selectedCourseId by viewModel.selectedCourseId.collectAsState()
     val context = LocalContext.current
 
     var title by remember { mutableStateOf("") }
@@ -76,6 +91,7 @@ fun CreateListingScreen(
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     val selectedCondition = remember { mutableStateOf(ListingCondition.NEW) }
     var selectedCategory by remember { mutableStateOf("Books") }
+    var showCourseMenu by remember { mutableStateOf(false) }
 
     var isDraftLoaded by remember { mutableStateOf(false) }
 
@@ -146,8 +162,10 @@ fun CreateListingScreen(
         }
     }
 
-    LaunchedEffect(state) {
-        if (state is CreateListingState.Success) {
+    LaunchedEffect(Unit) {
+        viewModel.listingCreated.collectLatest { createdListingId ->
+            navController.previousBackStackEntry?.savedStateHandle?.set("listing_created", true)
+            navController.previousBackStackEntry?.savedStateHandle?.set("listing_created_id", createdListingId)
             navController.popBackStack()
         }
     }
@@ -222,7 +240,7 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = description,
                 onValueChange = {
-                    if (!isLoading && it.length <= MAX_DESC_CHARS) {
+                    if (it.length <= 320) {
                         description = it
                         isAutoDescription = false
                     }
@@ -314,6 +332,47 @@ fun CreateListingScreen(
                 }
             }
 
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .shadow(
+                        elevation = 4.dp,
+                        shape = RoundedCornerShape(12.dp),
+                        ambientColor = Color.Black.copy(alpha = 0.08f)
+                    )
+                    .background(Color.White, RoundedCornerShape(12.dp))
+                    .clickable { showCourseMenu = true }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                val courseLabel = courses.firstOrNull { it.id == selectedCourseId }?.name
+                    ?: "Curso (opcional)"
+                Text(text = courseLabel, color = TextPrimary)
+
+                DropdownMenu(
+                    expanded = showCourseMenu,
+                    onDismissRequest = { showCourseMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Sin curso") },
+                        onClick = {
+                            viewModel.setSelectedCourse(null)
+                            showCourseMenu = false
+                        }
+                    )
+                    courses.forEach { course ->
+                        DropdownMenuItem(
+                            text = { Text(course.name) },
+                            onClick = {
+                                viewModel.setSelectedCourse(course.id)
+                                showCourseMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
             AccentButton(
                 text = "Publish",
                 onClick = {
@@ -331,8 +390,8 @@ fun CreateListingScreen(
                                 category = categoryMap[selectedCategory]?.value,
                                 condition = selectedCondition.value.value,
                                 original_price = null,
-                                selling_price = p,
-                                course_id = null
+                                selling_price = parsedPrice,
+                                course_id = selectedCourseId
                             )
                             viewModel.createListing(req, selectedImageUris)
                         }

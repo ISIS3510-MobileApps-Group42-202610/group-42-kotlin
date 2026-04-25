@@ -18,6 +18,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unimarketfrontend.ui.components.RecentlyAddedCard
 import com.example.unimarketfrontend.viewmodel.ManageProductsState
 import com.example.unimarketfrontend.viewmodel.ManageProductsViewModel
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.unimarketfrontend.ui.components.BottomNavigationBar
+import com.example.unimarketfrontend.ui.navigation.navigateTracked
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +30,14 @@ fun ManageProductsScreen(
 ) {
 
     val state by viewModel.state.collectAsState()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val isManageVisible = backStackEntry?.destination?.route == "manage"
+
+    LaunchedEffect(isManageVisible) {
+        if (isManageVisible) {
+            viewModel.refresh()
+        }
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -35,6 +46,12 @@ fun ManageProductsScreen(
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Listing")
             }
+        },
+        bottomBar = {
+            BottomNavigationBar(
+                currentRoute = "manage",
+                onRouteChange = { route -> navController.navigateTracked(route) }
+            )
         }
     ) { innerPadding ->
 
@@ -138,7 +155,12 @@ fun ManageProductsScreen(
                             )
                         ) {
                             items(currentList) { listing ->
-                                RecentlyAddedCard(listing)
+                                RecentlyAddedCard(
+                                    listing = listing,
+                                    onClick = { 
+                                        navController.navigate("listingDetail/${listing.id}") 
+                                    }
+                                )
                                 Spacer(modifier = Modifier.height(16.dp))
                             }
                         }
