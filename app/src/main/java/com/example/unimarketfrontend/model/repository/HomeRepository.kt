@@ -13,6 +13,15 @@ class HomeRepository(
     private val listingDao: ListingDao
 ) {
 
+    private suspend fun preserveLocalInactiveState(remoteListing: Listing): Listing {
+        val cached = listingDao.getById(remoteListing.id)
+        return if (cached != null && !cached.active) {
+            remoteListing.copy(active = false)
+        } else {
+            remoteListing
+        }
+    }
+
     suspend fun getCachedActiveListings(): List<Listing> {
         return listingDao.getActive().map { it.toListing() }
     }
@@ -20,9 +29,15 @@ class HomeRepository(
     suspend fun refreshHomeData(): HomeResponseDto {
         val remote = api.getHomeRanking()
         val allRemoteListings = (remote.trending + remote.recent).distinctBy { it.id }
-        if (allRemoteListings.isNotEmpty()) {
-            listingDao.upsertAll(allRemoteListings.toEntities())
+        val mergedListings = allRemoteListings.map { preserveLocalInactiveState(it) }
+
+        if (mergedListings.isNotEmpty()) {
+            listingDao.upsertAll(mergedListings.toEntities())
         }
-        return remote
+
+        return remote.copy(
+            trending = remote.trending.map { preserveLocalInactiveState(it) },
+            recent = remote.recent.map { preserveLocalInactiveState(it) }
+        )
     }
 }

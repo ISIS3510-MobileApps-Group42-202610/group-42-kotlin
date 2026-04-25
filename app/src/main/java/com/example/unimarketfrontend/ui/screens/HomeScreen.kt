@@ -30,10 +30,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,9 +48,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import coil.compose.AsyncImage
 import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
+import com.example.unimarketfrontend.ui.components.OfflineBanner
 import com.example.unimarketfrontend.ui.navigation.createListingNavigationHandler
 import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.ui.theme.AccentOrange
@@ -69,8 +74,17 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val navigation = navController.createListingNavigationHandler()
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("All") }
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val isHomeVisible = backStackEntry?.destination?.route == "home"
+
+    LaunchedEffect(isHomeVisible) {
+        if (isHomeVisible) {
+            viewModel.refreshHome()
+        }
+    }
+
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedCategory by rememberSaveable { mutableStateOf("All") }
 
     when (state) {
         is HomeUiState.Loading -> {
@@ -88,6 +102,7 @@ fun HomeScreen(
 
         is HomeUiState.Success -> {
             val data = state as HomeUiState.Success
+            val isOnline by ConnectivityMonitor.isOnline.collectAsState()
             val allListings = remember(data.trending, data.recent) {
                 (data.trending + data.recent).distinctBy { it.id }
             }
@@ -105,7 +120,7 @@ fun HomeScreen(
                 bottomBar = {
                     BottomNavigationBar(
                         currentRoute = "home",
-                        onRouteChange = { route -> navController.navigateTracked(route) }
+                        onRouteChange = { route: String -> navController.navigateTracked(route) }
                     )
                 },
                 floatingActionButton = {
@@ -128,6 +143,10 @@ fun HomeScreen(
                         .background(BackgroundLight)
                         .padding(innerPadding)
                 ) {
+                    // Mostrar banner offline si no hay internet y tenemos datos cacheados
+                    if (!isOnline && allListings.isNotEmpty()) {
+                        OfflineBanner("Showing saved data. We will refresh when you are online.")
+                    }
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -156,8 +175,7 @@ fun HomeScreen(
                                     shape = RoundedCornerShape(12.dp),
                                     ambientColor = Color.Black.copy(alpha = 0.08f)
                                 )
-                                .background(Color.White, RoundedCornerShape(12.dp))
-                                .clickable { },
+                                .background(Color.White, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.CenterStart
                         ) {
                             Row(

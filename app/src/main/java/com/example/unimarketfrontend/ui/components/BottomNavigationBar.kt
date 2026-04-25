@@ -1,9 +1,10 @@
 package com.example.unimarketfrontend.ui.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -12,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 
 
-/*TODO: Esta parte es Incompleta*/
 @Composable
 fun BottomNavigationBar(
     currentRoute: String,
@@ -35,7 +35,14 @@ fun BottomNavigationBar(
         )
 
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Message, null) },
+            icon = { Icon(Icons.Default.ShoppingCart, null) },
+            label = { Text("Manage") },
+            selected = currentRoute == "manage",
+            onClick = { onRouteChange("manage") }
+        )
+
+        NavigationBarItem(
+            icon = { Icon(Icons.AutoMirrored.Filled.Message, null) },
             label = { Text("Messages") },
             selected = currentRoute == "messages",
             onClick = { onRouteChange("messages") }

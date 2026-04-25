@@ -65,7 +65,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         SendMessageRequest(seller_id = sellerId, content = content)
                     )
                     _messages.value = _messages.value + response
-                    AnalyticsLogger.log("message_sent", mapOf("seller_id" to sellerId.toString()))
+                    runCatching {
+                        AnalyticsLogger.log("message_sent", mapOf("seller_id" to sellerId.toString()))
+                    }
                 } catch (e: Exception) {
                     // Si falla el servidor pero el monitor decía que había red, 
                     // lo mandamos a la cola de pendientes para no perder el dato (Evita UC)
@@ -121,13 +123,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         if (responseTimes.isNotEmpty()) {
             val avg = responseTimes.average().toLong()
-            AnalyticsLogger.log(
-                "seller_avg_response_time",
-                mapOf(
-                    "seller_id" to sellerId.toString(),
-                    "avg_minutes" to avg.toString()
+            runCatching {
+                AnalyticsLogger.log(
+                    "seller_avg_response_time",
+                    mapOf(
+                        "seller_id" to sellerId.toString(),
+                        "avg_minutes" to avg.toString()
+                    )
                 )
-            )
+            }
         }
     }
 

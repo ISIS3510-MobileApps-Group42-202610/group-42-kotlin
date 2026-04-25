@@ -4,13 +4,18 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.network.external.CloudinaryUploadService
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 import com.example.unimarketfrontend.model.listing.CreateListingRequest
 import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.repository.ListingRepository
+import com.example.unimarketfrontend.model.utils.ErrorTranslator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,12 +35,42 @@ data class SmartSuggestion(
     val description: String
 )
 
+data class CourseOption(
+    val id: Int,
+    val name: String
+)
+
 class CreateListingViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val listingRepository = ListingRepository(
+        listingDao = AppDatabase.getInstance(application).listingDao()
+    )
 
     private val _state =
         MutableStateFlow<CreateListingState>(CreateListingState.Idle)
 
     val state: StateFlow<CreateListingState> = _state
+
+    private val _listingCreated = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+    val listingCreated: SharedFlow<Int> = _listingCreated
+
+    private val _courses = MutableStateFlow(
+        listOf(
+            CourseOption(101, "Matematicas I"),
+            CourseOption(102, "Calculo"),
+            CourseOption(103, "Fisica"),
+            CourseOption(104, "Programacion"),
+            CourseOption(105, "Electronica")
+        )
+    )
+    val courses: StateFlow<List<CourseOption>> = _courses
+
+    private val _selectedCourseId = MutableStateFlow<Int?>(null)
+    val selectedCourseId: StateFlow<Int?> = _selectedCourseId
+
+    fun setSelectedCourse(courseId: Int?) {
+        _selectedCourseId.value = courseId
+    }
 
     private fun buildHttpError(context: String, response: Response<*>): String {
         val errorBody = try {
@@ -72,6 +107,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
 
                 val requestWithImages = request.copy(
+                    course_id = request.course_id ?: _selectedCourseId.value,
                     images = imageUrls.mapIndexed { index, url ->
                         mapOf(
                             "url" to url,
@@ -95,11 +131,14 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     return@launch
                 }
 
-
+                // Persistimos el listing en cache local para que aparezca en listados al volver.
+                listingRepository.cacheRemoteListings(listOf(listing))
+                _listingCreated.tryEmit(listing.id)
                 _state.value = CreateListingState.Success
 
             } catch (e: Exception) {
-                _state.value = CreateListingState.Error(e.message ?: "Network error")
+                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
+                _state.value = CreateListingState.Error(userMessage)
             }
         }
     }

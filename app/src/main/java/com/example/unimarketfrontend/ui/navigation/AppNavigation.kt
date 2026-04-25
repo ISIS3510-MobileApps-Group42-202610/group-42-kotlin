@@ -74,7 +74,7 @@ fun AppNavigation() {
                 ListingDetailScreen(navController = navController, listingId = listingId)
             }
             composable(
-                route = "chat/{sellerId}/{sellerName}",
+                route = ChatRoutesFactory.CHAT_ROUTE,
                 arguments = listOf(
                     navArgument("sellerId") { type = NavType.IntType },
                     navArgument("sellerName") { type = NavType.StringType }

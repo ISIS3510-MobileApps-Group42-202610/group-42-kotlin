@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +71,7 @@ import com.example.unimarketfrontend.ui.theme.TextSecondary
 import com.example.unimarketfrontend.viewmodel.CreateListingState
 import com.example.unimarketfrontend.viewmodel.CreateListingViewModel
 import java.io.File
+import kotlinx.coroutines.flow.collectLatest
 
 private const val MAX_IMAGES_PER_LISTING = 8
 
@@ -84,6 +87,8 @@ fun CreateListingScreen(
     viewModel: CreateListingViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val courses by viewModel.courses.collectAsState()
+    val selectedCourseId by viewModel.selectedCourseId.collectAsState()
     val context = LocalContext.current
 
     var title by remember { mutableStateOf("") }
@@ -97,6 +102,7 @@ fun CreateListingScreen(
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     val selectedCondition = remember { mutableStateOf(ListingCondition.NEW) }
     var selectedCategory by remember { mutableStateOf("Books") }
+    var showCourseMenu by remember { mutableStateOf(false) }
 
     val categoryMap = mapOf(
         "Books" to ListingCategory.TEXTBOOK,
@@ -139,8 +145,10 @@ fun CreateListingScreen(
         }
     }
 
-    LaunchedEffect(state) {
-        if (state is CreateListingState.Success) {
+    LaunchedEffect(Unit) {
+        viewModel.listingCreated.collectLatest { createdListingId ->
+            navController.previousBackStackEntry?.savedStateHandle?.set("listing_created", true)
+            navController.previousBackStackEntry?.savedStateHandle?.set("listing_created_id", createdListingId)
             navController.popBackStack()
         }
     }
@@ -191,31 +199,33 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = title,
                 onValueChange = {
-                    title = it
-                    localError = null
+                    if (it.length <= 100) {
+                        title = it
+                        localError = null
 
-                    if (it.isBlank()) {
-                        isAutoDescription = true
-                        isAutoPrice = true
-                        isAutoCategory = true
-                    } else if (it.length >= 3) {
+                        if (it.isBlank()) {
+                            isAutoDescription = true
+                            isAutoPrice = true
+                            isAutoCategory = true
+                        } else if (it.length >= 3) {
 
-                        val suggestion = viewModel.suggestFromText(it)
+                            val suggestion = viewModel.suggestFromText(it)
 
-                        if (isAutoDescription) {
-                            description = suggestion.description
-                        }
+                            if (isAutoDescription) {
+                                description = suggestion.description
+                            }
 
-                        if (isAutoPrice) {
-                            price = suggestion.price.toString()
-                        }
+                            if (isAutoPrice) {
+                                price = suggestion.price.toString()
+                            }
 
-                        if (isAutoCategory) {
-                            selectedCategory = suggestion.category
+                            if (isAutoCategory) {
+                                selectedCategory = suggestion.category
+                            }
                         }
                     }
                 },
-                label = "Title",
+                label = "Title (${title.length}/100)",
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = {
                     Icon(Icons.Default.Image, contentDescription = null, tint = TextSecondary)
@@ -225,10 +235,12 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = description,
                 onValueChange = {
-                    description = it
-                    isAutoDescription = false
+                    if (it.length <= 320) {
+                        description = it
+                        isAutoDescription = false
+                    }
                 },
-                label = "Description",
+                label = "Description (${description.length}/320)",
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = {
                     Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
@@ -238,9 +250,13 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = price,
                 onValueChange = {
-                    price = it
-                    localError = null
-                    isAutoPrice = false
+                    val filtered = it.filter { char -> char.isDigit() || char == '.' }
+                    val doubleValue = filtered.toDoubleOrNull()
+                    if (doubleValue == null || doubleValue <= 9999999.0) {
+                        price = filtered
+                        localError = null
+                        isAutoPrice = false
+                    }
                 },
                 label = "Price",
                 modifier = Modifier.fillMaxWidth(),
@@ -329,6 +345,47 @@ fun CreateListingScreen(
                 }
             }
 
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .shadow(
+                        elevation = 4.dp,
+                        shape = RoundedCornerShape(12.dp),
+                        ambientColor = Color.Black.copy(alpha = 0.08f)
+                    )
+                    .background(Color.White, RoundedCornerShape(12.dp))
+                    .clickable { showCourseMenu = true }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                val courseLabel = courses.firstOrNull { it.id == selectedCourseId }?.name
+                    ?: "Curso (opcional)"
+                Text(text = courseLabel, color = TextPrimary)
+
+                DropdownMenu(
+                    expanded = showCourseMenu,
+                    onDismissRequest = { showCourseMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Sin curso") },
+                        onClick = {
+                            viewModel.setSelectedCourse(null)
+                            showCourseMenu = false
+                        }
+                    )
+                    courses.forEach { course ->
+                        DropdownMenuItem(
+                            text = { Text(course.name) },
+                            onClick = {
+                                viewModel.setSelectedCourse(course.id)
+                                showCourseMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
             AccentButton(
                 text = "Publish",
                 onClick = {
@@ -346,7 +403,7 @@ fun CreateListingScreen(
                                 condition = selectedCondition.value.value,
                                 original_price = null,
                                 selling_price = parsedPrice,
-                                course_id = null
+                                course_id = selectedCourseId
                             )
                             viewModel.createListing(request, selectedImageUris)
                         }

@@ -1,9 +1,12 @@
 package com.example.unimarketfrontend.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.local.AppDatabase
+import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.utils.ErrorTranslator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -17,7 +20,11 @@ sealed class ManageProductsState {
     data class Error(val message: String) : ManageProductsState()
 }
 
-class ManageProductsViewModel : ViewModel() {
+class ManageProductsViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = ListingRepository(
+        listingDao = AppDatabase.getInstance(application).listingDao()
+    )
 
     private val _state =
         MutableStateFlow<ManageProductsState>(ManageProductsState.Loading)
@@ -28,34 +35,40 @@ class ManageProductsViewModel : ViewModel() {
         loadProducts()
     }
 
+    fun refresh() {
+        loadProducts()
+    }
+
     private fun loadProducts() {
         viewModelScope.launch {
             try {
-
-                val response =
-                    RetrofitInstance.api.getMyListings()
+                // Obtenemos el usuario actual a través del repositorio
+                val currentUser = repository.getMe()
+                val response = repository.getMyListings()
 
                 if (response.isSuccessful) {
+                    response.body()?.let { repository.cacheMyListings(it) }
 
-                    val body = response.body()
+                    // Ajustamos el filtro para usar owner_user_id si está presente, 
+                    // de lo contrario usamos seller_id (retrocompatibilidad)
+                    val allActive = repository.getCachedActiveListings()
+                    val allSold = repository.getCachedSoldListings()
 
                     _state.value = ManageProductsState.Success(
-                        active = body?.active ?: emptyList(),
-                        sold = body?.sold ?: emptyList()
+                        active = allActive.filter { 
+                            (it.owner_user_id ?: it.seller_id) == currentUser.id 
+                        },
+                        sold = allSold.filter { 
+                            (it.owner_user_id ?: it.seller_id) == currentUser.id 
+                        }
                     )
-
                 } else {
-
-                    _state.value = ManageProductsState.Error(
-                        "HTTP ${response.code()}"
-                    )
+                    val userMessage = ErrorTranslator.getUserFriendlyMessage(null)
+                    _state.value = ManageProductsState.Error(userMessage)
                 }
-
             } catch (e: Exception) {
-
-                _state.value = ManageProductsState.Error(
-                    "Exception: ${e.localizedMessage}"
-                )
+                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
+                _state.value = ManageProductsState.Error(userMessage)
             }
         }
     }

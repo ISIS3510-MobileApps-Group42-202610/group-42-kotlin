@@ -1,8 +1,10 @@
 package com.example.unimarketfrontend.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.local.AppDatabase
+import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.listing.Listing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -10,8 +12,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class SearchViewModel : ViewModel() {
+class SearchViewModel(application: Application) : AndroidViewModel(application) {
 //LISTINGS ACTÚA CÓMO UN CACHE LOCAL PARA QUE SE PUEDA BUSCAR Y NO SATURE EL SERVER
+
+    private val repository = ListingRepository(
+        listingDao = AppDatabase.getInstance(application).listingDao()
+    )
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query
@@ -38,14 +44,18 @@ class SearchViewModel : ViewModel() {
         fetchAllListings()
     }
 
+    fun refresh() {
+        fetchAllListings()
+    }
+
 
     // AGRUPA TODOS LOS PRODUCTOS Y LANZA
     private fun fetchAllListings() {
         viewModelScope.launch {
             try {
-                allListings = RetrofitInstance.api.getListings().body() ?: emptyList()
+                allListings = repository.syncSearchListings()
             } catch (e: Exception) {
-                allListings = emptyList()
+                allListings = repository.getCachedActiveListings()
             }
         }
     }

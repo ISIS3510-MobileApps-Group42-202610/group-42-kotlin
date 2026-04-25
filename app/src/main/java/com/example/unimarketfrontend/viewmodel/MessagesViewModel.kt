@@ -91,12 +91,14 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
 
             _isRefreshing.value = false
 
-            // Analytics: mandamos cuantas conversaciones tiene el usuario sin leer
+            // Analytics: mandamos cuantas conversaciones tiene el usuario sin leer (best effort)
             val unreadCount = _conversations.value.count { !it.isRead }
-            AnalyticsLogger.log(
-                "messages_screen_opened",
-                mapOf("unread_conversations" to unreadCount.toString())
-            )
+            runCatching {
+                AnalyticsLogger.log(
+                    "messages_screen_opened",
+                    mapOf("unread_conversations" to unreadCount.toString())
+                )
+            }
         }
     }
 }

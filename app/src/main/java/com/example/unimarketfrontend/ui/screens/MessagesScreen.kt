@@ -20,6 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.unimarketfrontend.model.message.ConversationPreview
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
+import com.example.unimarketfrontend.ui.navigation.ChatRoutesFactory
 import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.viewmodel.MessagesViewModel
 
@@ -130,12 +131,10 @@ fun MessagesScreen(
                                 ),
                                 onClick = {
                                     navController.navigate(
-                                        "chat/${entity.otherPersonId}/${
-                                            java.net.URLEncoder.encode(entity.otherPersonName, "UTF-8")
-                                        }"
-                                    )
-                                }
-                            )
+                                        ChatRoutesFactory.chatPath(entity.otherPersonId, entity.otherPersonName)
+                                     )
+                                 }
+                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 76.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant

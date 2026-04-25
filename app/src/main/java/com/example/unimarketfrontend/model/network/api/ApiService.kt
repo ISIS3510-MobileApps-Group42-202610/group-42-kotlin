@@ -64,11 +64,17 @@ interface ApiService {
     @GET("api/v1/listings")
     suspend fun getListings(): Response<List<Listing>>
 
+    @GET("api/v1/listings/{id}")
+    suspend fun getListingById(@Path("id") listingId: Int): Response<Listing>
+
     @GET("api/v1/listings/my")
     suspend fun getMyListings(): Response<MyListingsResponse>
 
     @POST("api/v1/listings")
     suspend fun createListing(@Body request: CreateListingRequest): Response<Listing>
+
+    @DELETE("api/v1/listings/{id}")
+    suspend fun deleteListing(@Path("id") listingId: Int): Response<Unit>
 
     @GET("api/v1/listings/home/ranking")
     suspend fun getHomeRanking(): HomeResponseDto

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.utils.analytics.AnalyticsAuthMode
 import com.example.unimarketfrontend.model.utils.analytics.AnalyticsConfig
+import com.example.unimarketfrontend.model.utils.ErrorTranslator
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.repository.AuthRepository
 import com.example.unimarketfrontend.model.user.LoginRequest
@@ -16,7 +17,7 @@ class LoginViewModel : ViewModel() {
         email: String,
         password: String,
         onSuccess: () -> Unit,
-        onError: () -> Unit
+        onError: (String) -> Unit
     ) {
         viewModelScope.launch {
             try {
@@ -29,7 +30,8 @@ class LoginViewModel : ViewModel() {
                 onSuccess()
 
             } catch (e: Exception) {
-                onError()
+                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
+                onError(userMessage)
             }
         }
     }
