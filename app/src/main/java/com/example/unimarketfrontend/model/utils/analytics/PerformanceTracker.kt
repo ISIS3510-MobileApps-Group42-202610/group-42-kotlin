@@ -5,7 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.example.unimarketfrontend.model.analytics.PerformanceEventType
 import com.example.unimarketfrontend.model.analytics.PerformanceTelemetryRequest
-import com.example.unimarketfrontend.model.network.client.AnalyticsApiService
+import com.example.unimarketfrontend.model.network.api.AnalyticsApiService
 import com.example.unimarketfrontend.model.network.client.AnalyticsRetrofitInstance
 import com.example.unimarketfrontend.model.utils.NavigationTimingStore
 import kotlinx.coroutines.CoroutineScope

@@ -1,5 +1,6 @@
 package com.example.unimarketfrontend.model.repository
 
+import android.util.Log
 import com.example.unimarketfrontend.model.utils.analytics.AnalyticsConfig
 import com.example.unimarketfrontend.model.analytics.BusinessEventName
 import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
@@ -20,7 +21,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
-
 
 object AnalyticsRetrofitInstance {
     private val client by lazy {
@@ -51,8 +51,12 @@ class DefaultBusinessAnalyticsRepository(
     override suspend fun sendEvent(event: BusinessEventRequest): Result<Unit> {
         return try {
             val response = analyticsApiService.sendBusinessEvent(event)
-            if (response.isSuccessful) Result.success(Unit)
-            else Result.failure(IllegalStateException("Business analytics HTTP ${response.code()}: ${response.message()}"))
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: ""
+                Result.failure(IllegalStateException("HTTP ${response.code()}: ${response.message()} - $errorBody"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -61,8 +65,12 @@ class DefaultBusinessAnalyticsRepository(
     override suspend fun sendPerformance(event: PerformanceEventRequest): Result<Unit> {
         return try {
             val response = analyticsApiService.sendPerformanceEvent(event)
-            if (response.isSuccessful) Result.success(Unit)
-            else Result.failure(IllegalStateException("Performance analytics HTTP ${response.code()}: ${response.message()}"))
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: ""
+                Result.failure(IllegalStateException("HTTP ${response.code()}: ${response.message()} - $errorBody"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -132,7 +140,9 @@ class BusinessAnalyticsTracker(
         )
 
         scope.launch {
-            repository.sendPerformance(event)
+            repository.sendPerformance(event).onFailure {
+                Log.e("AnalyticsTracker", "Performance Error: ${it.message}", it)
+            }
         }
     }
 
@@ -156,7 +166,9 @@ class BusinessAnalyticsTracker(
                 metadata = metadata,
                 client_event_id = buildClientEventId(eventName.value, listingId)
             )
-            repository.sendEvent(event)
+            repository.sendEvent(event).onFailure {
+                Log.e("AnalyticsTracker", "Event Error (${eventName.value}): ${it.message}", it)
+            }
         }
     }
 
@@ -171,15 +183,13 @@ class BusinessAnalyticsTracker(
         }
     }
 
-    //SPRINT 3 - BQ10: Funcion para registrar cuando el usuario ve el banner de la U
     fun trackCampusBannerShown(
         listingId: Int,
-        sellerId: Int?,metadata: Map<String, Any?>? = null
+        sellerId: Int?,
+        metadata: Map<String, Any?>? = null
     ) {
         trackEvent(BusinessEventName.CAMPUS_BANNER_SHOWN, listingId, sellerId, metadata)
     }
-
-
 
     private fun nowIsoUtc(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)

@@ -363,7 +363,7 @@ fun ListingDetailScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     if (current.canMarkAsSold) {
                         Button(
@@ -401,18 +401,6 @@ fun ListingDetailScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    TextButton(
-                        onClick = {
-                            showRatingDialog = true
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Marcar como comprado")
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }

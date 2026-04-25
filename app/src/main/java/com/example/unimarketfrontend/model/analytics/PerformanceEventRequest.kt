@@ -13,4 +13,3 @@ data class PerformanceTelemetryRequest(
     val os_version: String,
     val app_version: String
 )
-

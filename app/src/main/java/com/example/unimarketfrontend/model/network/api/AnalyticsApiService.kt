@@ -3,14 +3,14 @@ package com.example.unimarketfrontend.model.network.api
 import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceTelemetryRequest
+import com.example.unimarketfrontend.network.model.AnalyticsEvent
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
 
 interface AnalyticsApiService {
-    //BQ4 EN EL CHAT VIEW MODEL COMPARA TIMESTAMP DE TIEMPO RTA DEL VENDEDOR
-    //ANALYTICS APPY SERVICE, ENVÍA EVENTOS Y LA RTA A LOS DIF ENDPOINTS DEL BACK
-    //BACKEND PYTHON/DJANGO
+    @POST("events")
+    suspend fun logEvent(@Body event: AnalyticsEvent)
 
     @POST("api/business-events/")
     suspend fun sendBusinessEvent(
