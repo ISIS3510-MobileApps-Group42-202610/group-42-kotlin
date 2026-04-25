@@ -8,6 +8,8 @@ import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.repository.HomeRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -28,11 +30,6 @@ data class CategoryUi(
     val count: Int
 )
 
-/*
- * ViewModel de la Home para el Sprint 3.
- * Aca manejamos la logica de "Cache-then-Network" para que la app cargue rapido.
- * Si no hay red, mostramos los productos guardados en Room.
- */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val homeRepository = HomeRepository(
@@ -50,10 +47,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         loadHome()
     }
 
-    // Escuchamos al monitor de red para saber si volvio el internet
     private fun observeConnectivity() {
         viewModelScope.launch {
-            // Usamos el objeto directamente sin instanciar
             ConnectivityMonitor.isOnline.collect { online ->
                 if (online && shouldRetryWhenOnline && !isLoadingHome) {
                     shouldRetryWhenOnline = false
@@ -73,34 +68,39 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = HomeUiState.Loading
             }
 
-            // Sacamos el nombre del usuario logueado para saludarlo
-            val userName = runCatching { RetrofitInstance.api.getMe().name }.getOrDefault("there")
-
-            // Primero mostramos lo que hay en el celular (Cache local)
             val cachedListings = homeRepository.getCachedActiveListings()
 
-            if (cachedListings.isNotEmpty()) {
+            if (cachedListings.isNotEmpty() && _uiState.value !is HomeUiState.Success) {
                 _uiState.value = HomeUiState.Success(
-                    userName = userName,
+                    userName = "...",
                     trending = cachedListings,
                     recent = emptyList(),
                     categories = categoriesFromListings(cachedListings)
                 )
             }
 
-            // Intentamos bajar los datos mas frescos del servidor
             try {
-                val homeResponse = homeRepository.refreshHomeData()
-                _uiState.value = HomeUiState.Success(
-                    userName = userName,
-                    trending = homeResponse.trending.filter { it.active },
-                    recent = homeResponse.recent.filter { it.active },
-                    categories = homeResponse.categories.map { CategoryUi(it.category, it.count) }
-                )
+                coroutineScope {
+                    val userDeferred = async {
+                        runCatching { RetrofitInstance.api.getMe().name }.getOrDefault("there")
+                    }
+                    val homeDataDeferred = async {
+                        homeRepository.refreshHomeData()
+                    }
+
+                    val userName = userDeferred.await()
+                    val homeResponse = homeDataDeferred.await()
+
+                    _uiState.value = HomeUiState.Success(
+                        userName = userName,
+                        trending = homeResponse.trending.filter { it.active },
+                        recent = homeResponse.recent.filter { it.active },
+                        categories = homeResponse.categories.map { CategoryUi(it.category, it.count) }
+                    )
+                }
                 shouldRetryWhenOnline = false
             } catch (e: Exception) {
                 shouldRetryWhenOnline = true
-                // Si Room esta vacio y falla el internet, mostramos error
                 if (cachedListings.isEmpty()) {
                     _uiState.value = HomeUiState.Error(e.message ?: "No hay conexion a internet")
                 }
@@ -118,7 +118,3 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             .sortedByDescending { it.count }
     }
 }
-
-
-
-
