@@ -10,7 +10,7 @@ import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.message.Message
 import com.example.unimarketfrontend.model.message.SendMessageRequest
-import com.example.unimarketfrontend.repository.MessagesRepository
+import com.example.unimarketfrontend.model.repository.MessagesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -39,7 +39,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 // SPRINT 3: Podríamos implementar cache de mensajes por hilo aquí también.
-                val thread = RetrofitInstance.api.getThread(sellerId)
+                val thread = repository.getThread(sellerId)
                 _messages.value = thread
 
                 // BQ4: Tiempo de respuesta (Smart Feature)
@@ -61,9 +61,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             if (isOnline) {
                 try {
                     // Intento de envío real al servidor NestJS
-                    val response = RetrofitInstance.api.sendMessageAsBuyer(
-                        SendMessageRequest(seller_id = sellerId, content = content)
-                    )
+                    val response = repository.sendMessage(sellerId, content)
                     _messages.value = _messages.value + response
                     runCatching {
                         AnalyticsLogger.log("message_sent", mapOf("seller_id" to sellerId.toString()))

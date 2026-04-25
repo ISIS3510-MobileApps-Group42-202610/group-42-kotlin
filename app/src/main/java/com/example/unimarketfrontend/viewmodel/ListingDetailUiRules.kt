@@ -30,22 +30,27 @@ fun buildListingDetailActionState(
         ?.takeIf { it.isNotBlank() }
         ?: "Usuario #${listing.seller_id}"
 
-    val isOwner = currentUser?.id == listing.seller_id
+    val sellerActualUserId = listing.owner_user_id ?: seller?.id ?: -1
+    val isOwner = currentUser?.id != null && currentUser.id == sellerActualUserId
+    
     val contactTarget = when {
         isOwner -> buyer
         currentUser?.id == listing.buyer_id -> seller
         else -> seller
     }
+    
     val contactTargetName = contactTarget?.let { "${it.name} ${it.last_name}".trim() }
         ?.takeIf { it.isNotBlank() }
+        
     val contactActionLabel = when {
         isOwner && buyer != null -> "Contactar comprador"
         isOwner -> "Sin comprador"
         else -> "Contactar vendedor"
     }
+    
     val externalCommentsCount = reviews.count { review ->
         val authorId = review.authorUserId()
-        authorId != null && authorId != listing.seller_id
+        authorId != null && authorId != sellerActualUserId
     }
 
     return ListingDetailActionState(
@@ -59,4 +64,3 @@ fun buildListingDetailActionState(
         externalCommentsCount = externalCommentsCount
     )
 }
-

@@ -21,20 +21,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,8 +85,8 @@ fun CreateListingScreen(
 
     val isLoading = state is CreateListingState.CreatingListing || state is CreateListingState.UploadingImages
 
-    val MAX_TITLE_CHARS = 30
-    val MAX_DESC_CHARS = 100
+    val MAX_TITLE_CHARS = 100
+    val MAX_DESC_CHARS = 320
     val MAX_PRICE = 25000000.0
 
     val categoryMap = mapOf(
@@ -240,7 +228,7 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = description,
                 onValueChange = {
-                    if (it.length <= 320) {
+                    if (it.length <= MAX_DESC_CHARS) {
                         description = it
                         isAutoDescription = false
                     }
@@ -390,7 +378,7 @@ fun CreateListingScreen(
                                 category = categoryMap[selectedCategory]?.value,
                                 condition = selectedCondition.value.value,
                                 original_price = null,
-                                selling_price = parsedPrice,
+                                selling_price = p,
                                 course_id = selectedCourseId
                             )
                             viewModel.createListing(req, selectedImageUris)

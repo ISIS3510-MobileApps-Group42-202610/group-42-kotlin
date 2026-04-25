@@ -7,7 +7,7 @@ import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.local.ConversationEntity
 import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.model.utils.analytics.AnalyticsLogger
-import com.example.unimarketfrontend.repository.MessagesRepository
+import com.example.unimarketfrontend.model.repository.MessagesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -48,7 +48,7 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
 
     private fun observeLocalConversations() {
         viewModelScope.launch {
-            repository.observeConversations().collectLatest { cached ->
+            repository.observeConversations().collectLatest { cached: List<ConversationEntity> ->
                 _conversations.value = cached
             }
         }
@@ -56,7 +56,7 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
 
     private fun observeConnectivity() {
         viewModelScope.launch {
-            ConnectivityMonitor.isOnline.collectLatest { online ->
+            ConnectivityMonitor.isOnline.collectLatest { online: Boolean ->
                 _isOffline.value = !online
                 // Si vuelve el internet, aprovechamos para enviar lo que quedo pendiente en la cola
                 if (online) {
