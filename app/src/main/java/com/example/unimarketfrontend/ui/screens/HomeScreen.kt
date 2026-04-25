@@ -29,6 +29,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -169,7 +172,7 @@ fun HomeScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp)
+                                .height(56.dp)
                                 .shadow(
                                     elevation = 6.dp,
                                     shape = RoundedCornerShape(12.dp),
@@ -178,34 +181,32 @@ fun HomeScreen(
                                 .background(Color.White, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.CenterStart
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Search,
-                                    contentDescription = "Search",
-                                    tint = TextSecondary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                androidx.compose.material3.OutlinedTextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
-                                    placeholder = { Text("Search books, notes...", color = TextSecondary) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 8.dp),
-                                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                                        unfocusedBorderColor = Color.Transparent,
-                                        focusedBorderColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        focusedContainerColor = Color.Transparent
-                                    ),
-                                    singleLine = true
-                                )
-                            }
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = { if (it.length <= 100) searchQuery = it },
+                                placeholder = { Text("Search books, notes...", color = TextSecondary) },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = TextStyle(color = TextPrimary, fontSize = 16.sp),
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = "Search",
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                },
+                                colors = TextFieldDefaults.colors(
+                                    focusedTextColor = TextPrimary,
+                                    unfocusedTextColor = TextPrimary,
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    cursorColor = PrimaryIndigo
+                                ),
+                                singleLine = true
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))

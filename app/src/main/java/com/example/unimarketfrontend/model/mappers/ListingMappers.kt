@@ -10,6 +10,7 @@ fun Listing.toEntity(): ListingEntity {
     return ListingEntity(
         id = id,
         sellerId = seller_id,
+        ownerUserId = owner_user_id,
         buyerId = buyer_id,
         courseId = course_id,
         title = title,
@@ -31,6 +32,7 @@ fun ListingEntity.toListing(): Listing {
     return Listing(
         id = id,
         seller_id = sellerId,
+        owner_user_id = ownerUserId, // Mapeo del nuevo campo
         buyer_id = buyerId,
         course_id = courseId,
         title = title,

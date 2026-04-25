@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -11,8 +12,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unimarketfrontend.ui.components.RecentlyAddedCard
@@ -21,6 +24,10 @@ import com.example.unimarketfrontend.viewmodel.ManageProductsViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import com.example.unimarketfrontend.ui.navigation.navigateTracked
+import com.example.unimarketfrontend.ui.theme.BackgroundLight
+import com.example.unimarketfrontend.ui.theme.PrimaryIndigo
+import com.example.unimarketfrontend.ui.theme.TextPrimary
+import com.example.unimarketfrontend.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,7 +35,6 @@ fun ManageProductsScreen(
     navController: NavController,
     viewModel: ManageProductsViewModel = viewModel()
 ) {
-
     val state by viewModel.state.collectAsState()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val isManageVisible = backStackEntry?.destination?.route == "manage"
@@ -40,9 +46,12 @@ fun ManageProductsScreen(
     }
 
     Scaffold(
+        containerColor = BackgroundLight,
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { navController.navigate("createListing") }
+                onClick = { navController.navigate("createListing") },
+                containerColor = PrimaryIndigo,
+                contentColor = Color.White
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Listing")
             }
@@ -54,114 +63,78 @@ fun ManageProductsScreen(
             )
         }
     ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundLight)
+                .padding(innerPadding)
+        ) {
+            Text(
+                text = "Manage Products",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                modifier = Modifier.padding(16.dp)
+            )
 
-        when (state) {
-
-            is ManageProductsState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            is ManageProductsState.Error -> {
-                val error = state as ManageProductsState.Error
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(error.message)
-                }
-            }
-
-            is ManageProductsState.Success -> {
-
-                val successState = state as ManageProductsState.Success
-                val activeListings = successState.active
-                val soldListings = successState.sold
-
-                var selectedTab by remember { mutableStateOf("active") }
-
-                val currentList =
-                    if (selectedTab == "active") activeListings else soldListings
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                ) {
-
-                    Text(
-                        text = "Manage Products",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(16.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .clip(MaterialTheme.shapes.large)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-
-                        TabButton(
-                            title = "Active (${activeListings.size})",
-                            isSelected = selectedTab == "active",
-                            onClick = { selectedTab = "active" }
-                        )
-
-                        TabButton(
-                            title = "Sold (${soldListings.size})",
-                            isSelected = selectedTab == "sold",
-                            onClick = { selectedTab = "sold" }
-                        )
+            when (state) {
+                is ManageProductsState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = PrimaryIndigo)
                     }
+                }
+                is ManageProductsState.Error -> {
+                    val error = state as ManageProductsState.Error
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(error.message, color = TextSecondary)
+                    }
+                }
+                is ManageProductsState.Success -> {
+                    val successState = state as ManageProductsState.Success
+                    var selectedTab by remember { mutableStateOf("active") }
+                    val currentList = if (selectedTab == "active") successState.active else successState.sold
 
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    if (currentList.isEmpty()) {
-
-                        Box(
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
+                                .padding(4.dp)
                         ) {
-                            Text(
-                                text = if (selectedTab == "active")
-                                    "No active listings"
-                                else
-                                    "No sold listings",
-                                style = MaterialTheme.typography.bodyLarge
+                            TabButton(
+                                title = "Active (${successState.active.size})",
+                                isSelected = selectedTab == "active",
+                                onClick = { selectedTab = "active" }
+                            )
+                            TabButton(
+                                title = "Sold (${successState.sold.size})",
+                                isSelected = selectedTab == "sold",
+                                onClick = { selectedTab = "sold" }
                             )
                         }
 
-                    } else {
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        LazyColumn(
-                            contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                bottom = 100.dp
-                            )
-                        ) {
-                            items(currentList) { listing ->
-                                RecentlyAddedCard(
-                                    listing = listing,
-                                    onClick = { 
-                                        navController.navigate("listingDetail/${listing.id}") 
-                                    }
+                        if (currentList.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = if (selectedTab == "active") "No active listings" else "No sold listings",
+                                    color = TextSecondary
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 100.dp)
+                            ) {
+                                items(currentList) { listing ->
+                                    RecentlyAddedCard(
+                                        listing = listing,
+                                        onClick = { navController.navigate("listingDetail/${listing.id}") }
+                                    )
+                                }
                             }
                         }
                     }
@@ -179,22 +152,14 @@ private fun RowScope.TabButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = Modifier
-            .weight(1f)
-            .padding(4.dp),
+        modifier = Modifier.weight(1f),
+        shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = if (isSelected) PrimaryIndigo else Color.Transparent,
+            contentColor = if (isSelected) Color.White else TextSecondary
+        ),
+        elevation = null
     ) {
-        Text(
-            text = title,
-            color = if (isSelected)
-                MaterialTheme.colorScheme.onPrimary
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }

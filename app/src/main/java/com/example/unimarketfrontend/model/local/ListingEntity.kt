@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class ListingEntity(
     @PrimaryKey val id: Int,
     val sellerId: Int,
+    val ownerUserId: Int?, // Nuevo campo para coincidir con el ajuste del backend
     val buyerId: Int?,
     val courseId: Int?,
     val title: String,

@@ -14,7 +14,7 @@ import com.example.unimarketfrontend.model.local.dao.MessagesDao
  */
 @Database(
     entities = [ListingEntity::class, ConversationEntity::class, PendingMessageEntity::class],
-    version = 3, // Subimos la version porque agregamos tablas de mensajes
+    version = 4, // Subimos la versión porque añadimos ownerUserId a ListingEntity
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

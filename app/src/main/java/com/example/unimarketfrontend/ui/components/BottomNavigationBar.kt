@@ -5,7 +5,6 @@ import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -25,13 +24,6 @@ fun BottomNavigationBar(
             label = { Text("Home") },
             selected = currentRoute == "home",
             onClick = { onRouteChange("home") }
-        )
-
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Search, null) },
-            label = { Text("Search") },
-            selected = currentRoute == "search",
-            onClick = { onRouteChange("search") }
         )
 
         NavigationBarItem(
