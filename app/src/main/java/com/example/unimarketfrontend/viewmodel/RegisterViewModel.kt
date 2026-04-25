@@ -2,7 +2,6 @@ package com.example.unimarketfrontend.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.auth.RegisterRequest
 import com.example.unimarketfrontend.model.repository.AuthRepository
 import kotlinx.coroutines.launch
@@ -30,7 +29,7 @@ class RegisterViewModel : ViewModel() {
                         email     = email,
                         password  = password,
                         semester  = semester,
-                        is_seller = isSeller
+                        is_seller = true
                     )
                 )
                 onSuccess()

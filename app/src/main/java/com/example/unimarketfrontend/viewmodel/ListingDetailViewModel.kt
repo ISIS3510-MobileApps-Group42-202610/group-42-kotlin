@@ -1,24 +1,26 @@
 package com.example.unimarketfrontend.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.local.AppDatabase
-import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
-import com.example.unimarketfrontend.model.utils.ErrorTranslator
-import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Review
 import com.example.unimarketfrontend.model.message.SendMessageRequest
-import com.example.unimarketfrontend.model.user.User
+import com.example.unimarketfrontend.model.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
+import com.example.unimarketfrontend.model.repository.ListingCacheThenNetworkResult
 import com.example.unimarketfrontend.model.repository.ListingRepository
+import com.example.unimarketfrontend.model.user.User
+import com.example.unimarketfrontend.model.utils.ErrorTranslator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 sealed class ListingDetailUiState {
     object Loading : ListingDetailUiState()
+
     data class Success(
         val listing: Listing,
         val seller: User?,
@@ -33,6 +35,7 @@ sealed class ListingDetailUiState {
         val reviews: List<Review>,
         val ratingSummary: RatingSummaryUi
     ) : ListingDetailUiState()
+
     data class Error(val message: String) : ListingDetailUiState()
 }
 
@@ -41,60 +44,70 @@ data class RatingSummaryUi(
     val count: Int
 )
 
+private data class ListingDetailActionState(
+    val sellerDisplayName: String,
+    val contactTargetId: Int?,
+    val contactTargetName: String?,
+    val contactActionLabel: String,
+    val isOwner: Boolean,
+    val canMarkAsSold: Boolean,
+    val hasExternalComments: Boolean,
+    val externalCommentsCount: Int
+)
+
 class ListingDetailViewModel(
-    private val listingId: Int,
-    private val listingRepository: ListingRepository
-) : ViewModel() {
+    application: Application,
+    private val listingId: Int
+) : AndroidViewModel(application) {
+
+    private val repository = ListingRepository(
+        listingDao = AppDatabase.getInstance(application).listingDao()
+    )
 
     private val _uiState = MutableStateFlow<ListingDetailUiState>(ListingDetailUiState.Loading)
     val uiState: StateFlow<ListingDetailUiState> = _uiState
 
     private var isLoadingListing = false
-    private var shouldRetryWhenOnline = false
+    private var listingViewedTracked = false
+    private var chatStartedTracked = false
+    private var firstMessageSentTracked = false
 
     init {
-        observeConnectivity()
         loadListing()
-    }
-
-    private fun observeConnectivity() {
-        viewModelScope.launch {
-            ConnectivityMonitor.isOnline.collect { online ->
-                if (online && shouldRetryWhenOnline && !isLoadingListing) {
-                    shouldRetryWhenOnline = false
-                    loadListing(forceLoading = false)
-                }
-            }
-        }
     }
 
     private fun loadListing(forceLoading: Boolean = true) {
         if (isLoadingListing) return
-        isLoadingListing = true
+
+        val startMs = System.currentTimeMillis()
 
         viewModelScope.launch {
-            if (forceLoading && _uiState.value !is ListingDetailUiState.Success) {
+            isLoadingListing = true
+
+            if (forceLoading) {
                 _uiState.value = ListingDetailUiState.Loading
             }
 
-            val cachedListing = listingRepository.getCachedById(listingId)
-            if (cachedListing != null) {
-                emitSuccess(cachedListing)
-            }
-
             try {
-                val remoteListing = listingRepository.refreshById(listingId)
-                if (remoteListing != null) {
-                    emitSuccess(remoteListing)
-                } else if (cachedListing == null) {
-                    _uiState.value = ListingDetailUiState.Error("Producto no encontrado")
+                val result: ListingCacheThenNetworkResult =
+                    repository.getByIdCacheThenNetwork(listingId)
+
+                val listing = result.remote ?: result.cached
+
+                if (listing == null) {
+                    _uiState.value = ListingDetailUiState.Error("Listing no encontrado")
+                    trackLoadPerformance(startMs, "not_found")
+                    return@launch
                 }
-                shouldRetryWhenOnline = false
+
+                emitSuccess(listing)
+                trackListingViewed(listing)
+                trackLoadPerformance(startMs, "success")
+
             } catch (e: Exception) {
-                shouldRetryWhenOnline = true
-                if (cachedListing == null) {
-                    _uiState.value = ListingDetailUiState.Error("Fallo la carga: ${e.message}")
-                }
+                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
+                _uiState.value = ListingDetailUiState.Error(userMessage)
+                trackLoadPerformance(startMs, "exception")
             } finally {
                 isLoadingListing = false
             }
@@ -102,15 +115,36 @@ class ListingDetailViewModel(
     }
 
     private suspend fun emitSuccess(listing: Listing) {
-        // Usamos owner_user_id si existe, si no, retrocedemos a seller_id (comportamiento anterior)
         val sellerUserId = listing.owner_user_id ?: listing.seller_id
-        
-        val seller = runCatching { RetrofitInstance.api.getUserById(sellerUserId).body() }.getOrNull()
+
+        val seller = runCatching {
+            repository.getSellerInfo(listing.seller_id)
+        }.getOrNull()
+            ?.takeIf { it.isSuccessful }
+            ?.body()
+            ?: runCatching {
+                RetrofitInstance.api.getUserById(sellerUserId).body()
+            }.getOrNull()
+
         val buyer = listing.buyer_id?.let { buyerId ->
-            runCatching { RetrofitInstance.api.getUserById(buyerId).body() }.getOrNull()
+            runCatching {
+                RetrofitInstance.api.getUserById(buyerId).body()
+            }.getOrNull()
         }
-        val currentUser = runCatching { RetrofitInstance.api.getMe() }.getOrNull()
-        val reviews = runCatching { RetrofitInstance.api.getReviewsByListing(listing.id).body() }.getOrDefault(emptyList()) ?: emptyList()
+
+        val currentUser = runCatching {
+            RetrofitInstance.api.getMe()
+        }.getOrNull()
+
+        val reviews = runCatching {
+            repository.getReviews(listing.id)
+        }.getOrNull()
+            ?.takeIf { it.isSuccessful }
+            ?.body()
+            .orEmpty()
+
+        val ratingSummary = buildRatingSummary(reviews)
+
         val actionState = buildListingDetailActionState(
             listing = listing,
             seller = seller,
@@ -131,7 +165,125 @@ class ListingDetailViewModel(
             hasExternalComments = actionState.hasExternalComments,
             externalCommentsCount = actionState.externalCommentsCount,
             reviews = reviews,
-            ratingSummary = RatingSummaryUi(reviews.mapNotNull { it.rating }.average().takeIf { !it.isNaN() } ?: 0.0, reviews.size)
+            ratingSummary = ratingSummary
+        )
+    }
+
+    private fun buildListingDetailActionState(
+        listing: Listing,
+        seller: User?,
+        buyer: User?,
+        currentUser: User?,
+        reviews: List<Review>
+    ): ListingDetailActionState {
+        val sellerUserId = listing.owner_user_id ?: seller?.id ?: listing.seller_id
+        val currentUserId = currentUser?.id
+
+        val isOwner = currentUserId != null && currentUserId == sellerUserId
+        val canMarkAsSold = isOwner && listing.active
+
+        val sellerDisplayName = seller?.let {
+            "${it.name} ${it.last_name}".trim()
+        }?.takeIf { it.isNotBlank() } ?: "Vendedor"
+
+        val buyerDisplayName = buyer?.let {
+            "${it.name} ${it.last_name}".trim()
+        }?.takeIf { it.isNotBlank() }
+
+        val contactTargetId = if (isOwner) {
+            buyer?.id ?: listing.buyer_id
+        } else {
+            seller?.id ?: sellerUserId
+        }
+
+        val contactTargetName = if (isOwner) {
+            buyerDisplayName ?: listing.buyer_id?.let { "Usuario #$it" }
+        } else {
+            sellerDisplayName
+        }
+
+        val contactActionLabel = if (isOwner) {
+            "Contactar comprador"
+        } else {
+            "Contactar vendedor"
+        }
+
+        val externalComments = reviews.filter { review ->
+            val reviewerId = review.reviewer_id ?: review.user_id
+            reviewerId != null && reviewerId != currentUserId
+        }
+
+        return ListingDetailActionState(
+            sellerDisplayName = sellerDisplayName,
+            contactTargetId = contactTargetId,
+            contactTargetName = contactTargetName,
+            contactActionLabel = contactActionLabel,
+            isOwner = isOwner,
+            canMarkAsSold = canMarkAsSold,
+            hasExternalComments = externalComments.isNotEmpty(),
+            externalCommentsCount = externalComments.size
+        )
+    }
+
+    private fun buildRatingSummary(reviews: List<Review>): RatingSummaryUi {
+        val ratings = reviews.mapNotNull { it.rating?.toDouble() }
+
+        return RatingSummaryUi(
+            average = if (ratings.isEmpty()) 0.0 else ratings.average(),
+            count = ratings.size
+        )
+    }
+
+    private fun trackLoadPerformance(startMs: Long, status: String) {
+        BusinessAnalyticsProvider.tracker.trackPerformance(
+            metricName = "listing_detail_load_time",
+            valueMs = System.currentTimeMillis() - startMs,
+            listingId = listingId,
+            screenName = "ListingDetailScreen",
+            metadata = mapOf("status" to status)
+        )
+    }
+
+    private fun trackListingViewed(listing: Listing) {
+        if (listingViewedTracked) return
+
+        listingViewedTracked = true
+
+        BusinessAnalyticsProvider.tracker.trackListingViewed(
+            listingId = listing.id,
+            sellerId = listing.seller_id,
+            metadata = mapOf("source" to "listing_detail_screen")
+        )
+    }
+
+    fun trackChatStarted() {
+        if (chatStartedTracked) return
+
+        val listing = (uiState.value as? ListingDetailUiState.Success)?.listing ?: return
+
+        chatStartedTracked = true
+
+        BusinessAnalyticsProvider.tracker.trackChatStarted(
+            listingId = listing.id,
+            sellerId = listing.seller_id,
+            metadata = mapOf("entrypoint" to "contact_seller_button")
+        )
+    }
+
+    fun trackFirstMessageSent(messageLength: Int) {
+        if (firstMessageSentTracked) return
+
+        val listing = (uiState.value as? ListingDetailUiState.Success)?.listing ?: return
+
+        firstMessageSentTracked = true
+
+        BusinessAnalyticsProvider.tracker.trackFirstMessageSent(
+            listingId = listing.id,
+            sellerId = listing.seller_id,
+            metadata = mapOf(
+                "entrypoint" to "detail_screen",
+                "message_length" to messageLength.toString()
+            )
         )
     }
 
@@ -151,7 +303,7 @@ class ListingDetailViewModel(
             }
 
             try {
-                listingRepository.markAsSoldLocally(listingId)
+                repository.markAsSoldLocally(listingId)
                 loadListing(forceLoading = false)
                 onComplete()
             } catch (e: Exception) {
@@ -172,6 +324,7 @@ class ListingDetailViewModel(
 
             try {
                 val response = RetrofitInstance.api.deleteListing(listingId)
+
                 if (response.isSuccessful) {
                     onComplete()
                 } else {
@@ -183,28 +336,73 @@ class ListingDetailViewModel(
         }
     }
 
-    fun sendFirstMessage(recipientUserId: Int, content: String, onComplete: () -> Unit, onError: (String) -> Unit = {}) {
+    fun sendFirstMessage(
+        recipientUserId: Int,
+        content: String,
+        onComplete: () -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
             try {
-                val request = SendMessageRequest(seller_id = recipientUserId, content = content.trim())
+                val cleanContent = content.trim()
+
+                if (cleanContent.isBlank()) {
+                    onError("El mensaje no puede estar vacío")
+                    return@launch
+                }
+
+                val request = SendMessageRequest(
+                    seller_id = recipientUserId,
+                    content = cleanContent
+                )
+
                 RetrofitInstance.api.sendMessageAsBuyer(request)
+                trackFirstMessageSent(cleanContent.length)
                 onComplete()
+
             } catch (e: Exception) {
-                android.util.Log.e("ERROR", "No se pudo mandar el mensaje", e)
                 val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
                 onError(userMessage)
             }
         }
     }
+
+    fun trackTransactionCompleted(
+        rating: Int? = null,
+        responseTimeMinutes: Int? = null
+    ) {
+        val state = uiState.value as? ListingDetailUiState.Success ?: return
+        val listing = state.listing
+        val seller = state.seller
+
+        BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
+            listingId = listing.id,
+            sellerId = listing.seller_id,
+            metadata = mapOf(
+                "entrypoint" to "detail_screen",
+                "category" to (listing.category ?: "unknown"),
+                "product" to (listing.product ?: "unknown"),
+                "selling_price" to listing.selling_price.toString(),
+                "semester" to (seller?.semester?.toString() ?: "unknown"),
+                "seller_id" to listing.seller_id,
+                "rating" to (rating ?: 0),
+                "response_time_minutes" to (responseTimeMinutes ?: 0),
+                "seeded_bq5" to false
+            )
+        )
+    }
 }
+
 class ListingDetailViewModelFactory(
     private val application: Application,
     private val listingId: Int
 ) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        val repository = ListingRepository(
-            listingDao = AppDatabase.getInstance(application).listingDao()
-        )
-        return ListingDetailViewModel(listingId, repository) as T
+    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ListingDetailViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return ListingDetailViewModel(application, listingId) as T
+        }
+
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
