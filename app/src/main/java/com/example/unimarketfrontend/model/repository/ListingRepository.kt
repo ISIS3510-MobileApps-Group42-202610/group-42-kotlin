@@ -128,6 +128,8 @@ class ListingRepository(
 
     suspend fun getReviews(listingId: Int): Response<List<Review>> = api.getReviewsByListing(listingId)
 
+    suspend fun sendMessage(sellerId: Int, content: String) = api.sendMessageAsBuyer(SendMessageRequest(seller_id = sellerId, content = content))
+
     suspend fun getMyListings() = api.getMyListings()
 
     suspend fun cacheMyListings(listings: MyListingsResponse) {

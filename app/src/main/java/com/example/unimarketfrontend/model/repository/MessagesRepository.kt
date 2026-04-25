@@ -13,7 +13,8 @@ class MessagesRepository(
 ) {
     private val api = RetrofitInstance.api
 
-    fun observeConversations(): Flow<List<ConversationEntity>> = messagesDao.observeConversations()
+    fun observeConversations(): Flow<List<ConversationEntity>> =
+        messagesDao.observeConversations()
 
     suspend fun isCacheStale(maxAgeMs: Long = 10 * 60 * 1000L): Boolean {
         val oldest = messagesDao.getOldestCachedAt() ?: return true
@@ -31,7 +32,12 @@ class MessagesRepository(
     }
 
     suspend fun savePendingMessage(sellerId: Int, content: String) {
-        messagesDao.insertPending(PendingMessageEntity(sellerId = sellerId, content = content))
+        messagesDao.insertPending(
+            PendingMessageEntity(
+                sellerId = sellerId,
+                content = content
+            )
+        )
     }
 
     suspend fun retryPendingMessages(): Int {
@@ -49,23 +55,36 @@ class MessagesRepository(
                 messagesDao.deletePending(pending.localId)
                 sent++
             } catch (_: Exception) {
-                // Se queda pendiente para el siguiente intento.
             }
         }
 
         return sent
     }
 
+    suspend fun getThread(sellerId: Int): List<Message> =
+        api.getThread(sellerId)
+
+    suspend fun sendMessage(sellerId: Int, content: String): Message =
+        api.sendMessageAsBuyer(
+            SendMessageRequest(
+                seller_id = sellerId,
+                content = content
+            )
+        )
+
     private fun List<Message>.toConversationEntities(): List<ConversationEntity> {
         return groupBy { message ->
             message.seller_id ?: message.buyer_id ?: message.id
         }.map { (otherId, messages) ->
             val last = messages.maxByOrNull { it.created_at.orEmpty() }
+
             ConversationEntity(
                 otherPersonId = otherId,
-                otherPersonName = last?.seller?.user?.let { "${it.name} ${it.last_name}".trim() }
-                    ?: last?.buyer?.user?.let { "${it.name} ${it.last_name}".trim() }
-                    ?: "Usuario #$otherId",
+                otherPersonName = last?.seller?.user?.let {
+                    "${it.name} ${it.last_name}".trim()
+                } ?: last?.buyer?.user?.let {
+                    "${it.name} ${it.last_name}".trim()
+                } ?: "Usuario #$otherId",
                 lastMessage = last?.content.orEmpty(),
                 lastMessageTime = last?.created_at.orEmpty(),
                 isRead = last?.is_read ?: false,
@@ -74,4 +93,3 @@ class MessagesRepository(
         }
     }
 }
-

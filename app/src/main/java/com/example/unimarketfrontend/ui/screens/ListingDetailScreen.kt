@@ -64,10 +64,6 @@ import com.example.unimarketfrontend.viewmodel.ListingDetailViewModelFactory
 import java.util.Locale
 import kotlin.math.floor
 
-/*
- * Pantalla de detalle del producto - SPRINT 3
- * Corregimos los errores de analiticas y sincronizamos con el nuevo ViewModel.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListingDetailScreen(
@@ -77,10 +73,14 @@ fun ListingDetailScreen(
     val app = LocalContext.current.applicationContext as Application
     val vm: ListingDetailViewModel = viewModel(factory = ListingDetailViewModelFactory(app, listingId))
     val state by vm.uiState.collectAsState()
+
     var showMessageDialog by remember { mutableStateOf(false) }
     var messageText by remember { mutableStateOf("") }
     var messageError by remember { mutableStateOf<String?>(null) }
     var actionError by remember { mutableStateOf<String?>(null) }
+
+    var showRatingDialog by remember { mutableStateOf(false) }
+    var selectedRating by remember { mutableIntStateOf(5) }
 
     when (val current = state) {
         is ListingDetailUiState.Loading -> {
@@ -184,6 +184,43 @@ fun ListingDetailScreen(
                 )
             }
 
+            if (showRatingDialog) {
+                AlertDialog(
+                    onDismissRequest = { showRatingDialog = false },
+                    title = { Text("Finalizar Compra") },
+                    text = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            Text("¿Cómo calificarías la experiencia con este vendedor?")
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                repeat(5) { index ->
+                                    val starIndex = index + 1
+                                    Icon(
+                                        imageVector = if (starIndex <= selectedRating) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clickable { selectedRating = starIndex }
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                vm.trackTransactionCompleted(rating = selectedRating)
+                                showRatingDialog = false
+                            }
+                        ) { Text("Finalizar") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showRatingDialog = false }) { Text("Cancelar") }
+                    }
+                )
+            }
+
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -205,7 +242,6 @@ fun ListingDetailScreen(
                 ) {
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Carrusel de imagenes
                     if (images.isNotEmpty()) {
                         AsyncImage(
                             model = images[selectedImageIndex].url,
@@ -355,12 +391,25 @@ fun ListingDetailScreen(
                             onClick = {
                                 showMessageDialog = true
                                 messageError = null
+                                vm.trackChatStarted()
+
                             },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = contactTargetId != null
                         ) {
                             Text(contactActionLabel)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    TextButton(
+                        onClick = {
+                            showRatingDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Marcar como comprado")
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
