@@ -3,6 +3,7 @@ package com.example.unimarketfrontend.model.listing
 data class Listing(
     val id: Int,
     val seller_id: Int,
+    val owner_user_id: Int? = null,
     val buyer_id: Int?,
     val course_id: Int?,
     val title: String,
