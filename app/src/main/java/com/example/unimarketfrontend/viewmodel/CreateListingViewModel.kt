@@ -11,16 +11,21 @@ import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.repository.ListingRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.Response
+import java.util.concurrent.atomic.AtomicInteger
 
 sealed class CreateListingState {
     object Idle : CreateListingState()
     object CreatingListing : CreateListingState()
-    data class UploadingImages(val uploaded: Int, val total: Int) : CreateListingState()
+    data class UploadingImages(val uploaded: Int, val total: Int, val retryMessage: String? = null) : CreateListingState()
     object Success : CreateListingState()
     data class Error(val message: String) : CreateListingState()
 }
@@ -50,7 +55,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         }
 
         val details = buildString {
-            append("$context fallida")
+            append("$context failed")
             append(" (HTTP ${response.code()})")
             if (!response.message().isNullOrBlank()) {
                 append(": ${response.message()}")
@@ -89,14 +94,14 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
                 if (!createResponse.isSuccessful) {
                     _state.value = CreateListingState.Error(
-                        buildHttpError("Creacion de listing", createResponse)
+                        buildHttpError("Listing creation", createResponse)
                     )
                     return@launch
                 }
 
                 val listing = createResponse.body()
                 if (listing == null) {
-                    _state.value = CreateListingState.Error("Respuesta invalida al crear el listing")
+                    _state.value = CreateListingState.Error("Invalid response when creating listing")
                     return@launch
                 }
 
@@ -104,44 +109,81 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 _state.value = CreateListingState.Success
 
             } catch (e: Exception) {
-                _state.value = CreateListingState.Error(e.message ?: "Network error")
+                val userErrorMessage = when (e) {
+                    is java.net.UnknownHostException -> "No internet connection. Please check your network."
+                    is java.util.concurrent.TimeoutException -> "Upload took too long. Please try again."
+                    else -> e.message ?: "An unexpected error occurred"
+                }
+                _state.value = CreateListingState.Error(userErrorMessage)
             }
         }
     }
 
-    private suspend fun uploadImagesToCloudinary(imageUris: List<Uri>): List<String> {
+    private suspend fun uploadImagesToCloudinary(imageUris: List<Uri>): List<String> = coroutineScope {
         val signatureResponse = withContext(Dispatchers.IO) {
             listingRepository.getCloudinarySignature(
-                CloudinarySignatureRequest(listing_id = 0)  // dummy value para obtener firma
+                CloudinarySignatureRequest(listing_id = 0)
             )
         }
 
         if (!signatureResponse.isSuccessful || signatureResponse.body() == null) {
             throw IllegalStateException(
-                buildHttpError("Firma de subida segura", signatureResponse)
+                buildHttpError("Secure upload signature", signatureResponse)
             )
         }
 
         val signature = signatureResponse.body()!!
         val contentResolver = getApplication<Application>().contentResolver
-        val uploadedUrls = mutableListOf<String>()
 
-        imageUris.forEachIndexed { index, uri ->
-            _state.value = CreateListingState.UploadingImages(index, imageUris.size)
+        val completedUploads = AtomicInteger(0)
+        _state.value = CreateListingState.UploadingImages(0, imageUris.size)
 
-            val imageUrl: String = withContext(Dispatchers.IO) {
-                CloudinaryUploadService.uploadImage(
-                    contentResolver = contentResolver,
-                    imageUri = uri,
-                    signature = signature
-                )
+        val deferredUploads = imageUris.mapIndexed { index, uri ->
+            async(Dispatchers.IO) {
+                val imageUrl: String = retryIO(
+                    times = 3,
+                    onRetry = { attempt ->
+                        _state.value = CreateListingState.UploadingImages(
+                            completedUploads.get(),
+                            imageUris.size,
+                            "Photo ${index + 1}: Attempt $attempt/3..."
+                        )
+                    }
+                ) {
+                    CloudinaryUploadService.uploadImage(
+                        contentResolver = contentResolver,
+                        imageUri = uri,
+                        signature = signature
+                    )
+                }
+                val currentCompleted = completedUploads.incrementAndGet()
+                _state.value = CreateListingState.UploadingImages(currentCompleted, imageUris.size, null)
+                imageUrl
             }
-
-            uploadedUrls.add(imageUrl)
-            _state.value = CreateListingState.UploadingImages(index + 1, imageUris.size)
         }
 
-        return uploadedUrls
+        return@coroutineScope deferredUploads.awaitAll()
+    }
+
+    private suspend fun <T> retryIO(
+        times: Int = 3,
+        initialDelay: Long = 1000,
+        maxDelay: Long = 5000,
+        factor: Double = 2.0,
+        onRetry: (Int) -> Unit = {},
+        block: suspend () -> T
+    ): T {
+        var currentDelay = initialDelay
+        repeat(times - 1) { attempt ->
+            try {
+                return block()
+            } catch (e: Exception) {
+                onRetry(attempt + 1)
+            }
+            delay(currentDelay)
+            currentDelay = (currentDelay * factor).toLong().coerceAtMost(maxDelay)
+        }
+        return block()
     }
 
     fun suggestFromText(title: String): SmartSuggestion {
@@ -179,6 +221,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     description = "Comfortable and spacious furniture"
                 )
             }
+
             else -> {
                 SmartSuggestion(
                     category = "Other",

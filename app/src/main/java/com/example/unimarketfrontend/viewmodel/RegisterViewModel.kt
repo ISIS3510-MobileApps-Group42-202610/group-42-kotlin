@@ -29,7 +29,7 @@ class RegisterViewModel : ViewModel() {
                         email     = email,
                         password  = password,
                         semester  = semester,
-                        is_seller = isSeller
+                        is_seller = true
                     )
                 )
                 onSuccess()

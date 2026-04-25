@@ -9,16 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -29,18 +20,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,11 +42,7 @@ import com.example.unimarketfrontend.model.listing.ListingCategory
 import com.example.unimarketfrontend.model.listing.ListingCondition
 import com.example.unimarketfrontend.ui.components.AccentButton
 import com.example.unimarketfrontend.ui.components.NeumorphicTextField
-import com.example.unimarketfrontend.ui.theme.BackgroundLight
-import com.example.unimarketfrontend.ui.theme.PrimaryIndigo
-import com.example.unimarketfrontend.ui.theme.SecondaryEmerald
-import com.example.unimarketfrontend.ui.theme.TextPrimary
-import com.example.unimarketfrontend.ui.theme.TextSecondary
+import com.example.unimarketfrontend.ui.theme.*
 import com.example.unimarketfrontend.viewmodel.CreateListingState
 import com.example.unimarketfrontend.viewmodel.CreateListingViewModel
 import java.io.File
@@ -98,6 +75,10 @@ fun CreateListingScreen(
     val selectedCondition = remember { mutableStateOf(ListingCondition.NEW) }
     var selectedCategory by remember { mutableStateOf("Books") }
 
+    val MAX_TITLE_CHARS = 30
+    val MAX_DESC_CHARS = 100
+    val MAX_PRICE = 25000000.0
+
     val categoryMap = mapOf(
         "Books" to ListingCategory.TEXTBOOK,
         "Electronics" to ListingCategory.ELECTRONICS,
@@ -114,16 +95,12 @@ fun CreateListingScreen(
 
     val pickImagesLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_IMAGES_PER_LISTING)
-    ) { uris ->
-        addUris(uris)
-    }
+    ) { uris -> addUris(uris) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && pendingCameraUri != null) {
-            addUris(listOf(pendingCameraUri!!))
-        }
+        if (success && pendingCameraUri != null) addUris(listOf(pendingCameraUri!!))
         pendingCameraUri = null
     }
 
@@ -135,7 +112,7 @@ fun CreateListingScreen(
             pendingCameraUri = uri
             cameraLauncher.launch(uri)
         } else {
-            localError = "Se requiere permiso de camara para tomar fotos"
+            localError = "Camera permission is required to take photos"
         }
     }
 
@@ -152,9 +129,7 @@ fun CreateListingScreen(
             .verticalScroll(rememberScrollState())
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -164,14 +139,7 @@ fun CreateListingScreen(
                 modifier = Modifier.clickable { navController.popBackStack() },
                 tint = TextPrimary
             )
-
-            Text(
-                text = "Create listing",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-
+            Text("Create listing", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             Box(modifier = Modifier.size(24.dp))
         }
 
@@ -179,11 +147,7 @@ fun CreateListingScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .shadow(
-                    elevation = 6.dp,
-                    shape = RoundedCornerShape(20.dp),
-                    ambientColor = Color.Black.copy(alpha = 0.08f)
-                )
+                .shadow(6.dp, RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(alpha = 0.08f))
                 .background(Color(0xFFEFF1FC), RoundedCornerShape(20.dp))
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -191,93 +155,68 @@ fun CreateListingScreen(
             NeumorphicTextField(
                 value = title,
                 onValueChange = {
-                    title = it
-                    localError = null
-
-                    if (it.isBlank()) {
-                        isAutoDescription = true
-                        isAutoPrice = true
-                        isAutoCategory = true
-                    } else if (it.length >= 3) {
-
-                        val suggestion = viewModel.suggestFromText(it)
-
-                        if (isAutoDescription) {
-                            description = suggestion.description
-                        }
-
-                        if (isAutoPrice) {
-                            price = suggestion.price.toString()
-                        }
-
-                        if (isAutoCategory) {
-                            selectedCategory = suggestion.category
+                    if (it.length <= MAX_TITLE_CHARS) {
+                        title = it
+                        localError = null
+                        if (it.length >= 3) {
+                            val suggestion = viewModel.suggestFromText(it)
+                            if (isAutoDescription) description = suggestion.description
+                            if (isAutoPrice) price = suggestion.price.toString()
+                            if (isAutoCategory) selectedCategory = suggestion.category
                         }
                     }
                 },
-                label = "Title",
+                label = "Title (${title.length}/$MAX_TITLE_CHARS)",
                 modifier = Modifier.fillMaxWidth(),
-                leadingIcon = {
-                    Icon(Icons.Default.Image, contentDescription = null, tint = TextSecondary)
-                }
+                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = TextSecondary) }
             )
 
             NeumorphicTextField(
                 value = description,
                 onValueChange = {
-                    description = it
-                    isAutoDescription = false
+                    if (it.length <= MAX_DESC_CHARS) {
+                        description = it
+                        isAutoDescription = false
+                    }
                 },
-                label = "Description",
+                label = "Description (${description.length}/$MAX_DESC_CHARS)",
                 modifier = Modifier.fillMaxWidth(),
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
-                }
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) }
             )
 
             NeumorphicTextField(
                 value = price,
                 onValueChange = {
-                    price = it
-                    localError = null
-                    isAutoPrice = false
+                    val inputPrice = it.toDoubleOrNull()
+                    if (it.isEmpty() || (inputPrice != null && inputPrice <= MAX_PRICE)) {
+                        price = it
+                        localError = null
+                        isAutoPrice = false
+                    }
                 },
-                label = "Price",
+                label = "Price (Max 25M)",
                 modifier = Modifier.fillMaxWidth(),
-                leadingIcon = {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = TextSecondary)
-                }
+                leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = TextSecondary) }
             )
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("Books", "Notes", "Electronics", "Furniture", "Other").forEach { category ->
+                listOf("Books", "Notes", "Electronics", "Furniture", "Other").forEach { cat ->
                     Box(
                         modifier = Modifier
                             .height(40.dp)
-                            .shadow(
-                                elevation = 4.dp,
-                                shape = RoundedCornerShape(12.dp),
-                                ambientColor = Color.Black.copy(alpha = 0.08f)
-                            )
-                            .background(
-                                if (selectedCategory == category) PrimaryIndigo else Color(0xFFDDF3F0),
-                                RoundedCornerShape(12.dp)
-                            )
-                            .clickable { selectedCategory = category }
+                            .shadow(4.dp, RoundedCornerShape(12.dp), ambientColor = Color.Black.copy(alpha = 0.08f))
+                            .background(if (selectedCategory == cat) PrimaryIndigo else Color(0xFFDDF3F0), RoundedCornerShape(12.dp))
+                            .clickable {
+                                selectedCategory = cat
+                                isAutoCategory = false
+                            }
                             .padding(horizontal = 18.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = category,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (selectedCategory == category) Color.White else TextPrimary
-                        )
+                        Text(cat, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (selectedCategory == cat) Color.White else TextPrimary)
                     }
                 }
             }
@@ -286,23 +225,16 @@ fun CreateListingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
-                    .shadow(
-                        elevation = 4.dp,
-                        shape = RoundedCornerShape(14.dp),
-                        ambientColor = Color.Black.copy(alpha = 0.08f)
-                    )
+                    .shadow(4.dp, RoundedCornerShape(14.dp), ambientColor = Color.Black.copy(alpha = 0.08f))
                     .background(Color.White, RoundedCornerShape(14.dp))
-                    .clickable {
-                        pickImagesLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
+                    .clickable { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (selectedImageUris.isEmpty()) "Image upload placeholder" else "${selectedImageUris.size} image(s) selected",
+                    text = if (selectedImageUris.isEmpty()) "Upload Images (Max $MAX_IMAGES_PER_LISTING)"
+                    else "${selectedImageUris.size} / $MAX_IMAGES_PER_LISTING images selected",
                     color = TextPrimary,
-                    fontSize = 16.sp
+                    fontSize = 14.sp
                 )
             }
 
@@ -313,9 +245,7 @@ fun CreateListingScreen(
                             AsyncImage(
                                 model = uri,
                                 contentDescription = null,
-                                modifier = Modifier
-                                    .matchParentSize()
-                                    .clip(RoundedCornerShape(10.dp)),
+                                modifier = Modifier.matchParentSize().clip(RoundedCornerShape(10.dp)),
                                 contentScale = ContentScale.Crop
                             )
                             IconButton(
@@ -332,57 +262,40 @@ fun CreateListingScreen(
             AccentButton(
                 text = "Publish",
                 onClick = {
-                    val parsedPrice = price.toDoubleOrNull()
+                    val p = price.toDoubleOrNull()
                     when {
-                        title.isBlank() -> localError = "El titulo es obligatorio"
-                        parsedPrice == null || parsedPrice <= 0.0 -> localError = "Ingresa un precio valido"
-                        selectedImageUris.isEmpty() -> localError = "Debes seleccionar al menos 1 imagen"
+                        title.isBlank() -> localError = "Title is required"
+                        p == null || p <= 0.0 -> localError = "Enter a valid price"
+                        selectedImageUris.isEmpty() -> localError = "Select at least 1 image"
                         else -> {
                             localError = null
-                            val request = CreateListingRequest(
+                            val req = CreateListingRequest(
                                 title = title.trim(),
                                 product = description.ifBlank { null },
                                 category = categoryMap[selectedCategory]?.value,
                                 condition = selectedCondition.value.value,
                                 original_price = null,
-                                selling_price = parsedPrice,
+                                selling_price = p,
                                 course_id = null
                             )
-                            viewModel.createListing(request, selectedImageUris)
+                            viewModel.createListing(req, selectedImageUris)
                         }
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
+                modifier = Modifier.fillMaxWidth().height(50.dp)
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(42.dp)
-                        .background(Color.White, RoundedCornerShape(12.dp))
-                        .clickable {
-                            pickImagesLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
+                    modifier = Modifier.weight(1f).height(42.dp).background(Color.White, RoundedCornerShape(12.dp))
+                        .clickable { pickImagesLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     contentAlignment = Alignment.Center
-                ) {
-                    Text("Gallery", color = TextPrimary)
-                }
+                ) { Text("Gallery", color = TextPrimary) }
+
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(42.dp)
-                        .background(Color.White, RoundedCornerShape(12.dp))
+                    modifier = Modifier.weight(1f).height(42.dp).background(Color.White, RoundedCornerShape(12.dp))
                         .clickable {
-                            val permissionState = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.CAMERA
-                            )
-                            if (permissionState == PackageManager.PERMISSION_GRANTED) {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                                 val uri = createTempImageUri(context)
                                 pendingCameraUri = uri
                                 cameraLauncher.launch(uri)
@@ -391,37 +304,45 @@ fun CreateListingScreen(
                             }
                         },
                     contentAlignment = Alignment.Center
-                ) {
-                    Text("Camera", color = TextPrimary)
-                }
+                ) { Text("Camera", color = TextPrimary) }
             }
 
             if (localError != null) {
-                Text(text = localError!!, color = MaterialTheme.colorScheme.error)
+                Text(text = localError!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
             }
 
-            when (val currentState = state) {
+            when (val cur = state) {
                 is CreateListingState.CreatingListing -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.size(10.dp))
-                        Text("Creando listing...")
+                        Spacer(Modifier.size(10.dp))
+                        Text("Creating listing...")
                     }
                 }
                 is CreateListingState.UploadingImages -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.size(10.dp))
-                        Text("Subiendo fotos ${currentState.uploaded}/${currentState.total}")
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.size(10.dp))
+                            Text("Uploading photos ${cur.uploaded}/${cur.total}")
+                        }
+
+                        cur.retryMessage?.let { message ->
+                            Text(
+                                text = message,
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(top = 4.dp, start = 30.dp)
+                            )
+                        }
                     }
                 }
                 is CreateListingState.Error -> {
-                    Text(text = currentState.message, color = MaterialTheme.colorScheme.error)
+                    Text(cur.message, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                 }
                 else -> Unit
             }
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(Modifier.height(20.dp))
     }
 }
