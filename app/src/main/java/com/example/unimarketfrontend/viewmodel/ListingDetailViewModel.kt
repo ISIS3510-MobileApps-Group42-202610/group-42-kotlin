@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Review
+import com.example.unimarketfrontend.model.message.SendMessageRequest
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.ListingCacheThenNetworkResult
@@ -44,17 +45,6 @@ sealed class ListingDetailUiState {
 data class RatingSummaryUi(
     val average: Double,
     val count: Int
-)
-
-private data class ListingDetailActionState(
-    val sellerDisplayName: String,
-    val contactTargetId: Int?,
-    val contactTargetName: String?,
-    val contactActionLabel: String,
-    val isOwner: Boolean,
-    val canMarkAsSold: Boolean,
-    val hasExternalComments: Boolean,
-    val externalCommentsCount: Int
 )
 
 class ListingDetailViewModel(
@@ -191,62 +181,6 @@ class ListingDetailViewModel(
         )
     }
 
-    private fun buildListingDetailActionState(
-        listing: Listing,
-        seller: User?,
-        buyer: User?,
-        currentUser: User?,
-        reviews: List<Review>
-    ): ListingDetailActionState {
-        val sellerUserId = listing.owner_user_id ?: seller?.id ?: listing.seller_id
-        val currentUserId = currentUser?.id
-
-        val isOwner = currentUserId != null && currentUserId == sellerUserId
-        val canMarkAsSold = isOwner && listing.active
-
-        val sellerDisplayName = seller?.let {
-            "${it.name} ${it.last_name}".trim()
-        }?.takeIf { it.isNotBlank() } ?: "Vendedor"
-
-        val buyerDisplayName = buyer?.let {
-            "${it.name} ${it.last_name}".trim()
-        }?.takeIf { it.isNotBlank() }
-
-        val contactTargetId = if (isOwner) {
-            buyer?.id ?: listing.buyer_id
-        } else {
-            listing.seller_id
-        }
-
-        val contactTargetName = if (isOwner) {
-            buyerDisplayName ?: listing.buyer_id?.let { "Usuario #$it" }
-        } else {
-            sellerDisplayName
-        }
-
-        val contactActionLabel = if (isOwner) {
-            "Contactar comprador"
-        } else {
-            "Contactar vendedor"
-        }
-
-        val externalComments = reviews.filter { review ->
-            val reviewerId = review.reviewer_id ?: review.user_id
-            reviewerId != null && reviewerId != currentUserId
-        }
-
-        return ListingDetailActionState(
-            sellerDisplayName = sellerDisplayName,
-            contactTargetId = contactTargetId,
-            contactTargetName = contactTargetName,
-            contactActionLabel = contactActionLabel,
-            isOwner = isOwner,
-            canMarkAsSold = canMarkAsSold,
-            hasExternalComments = externalComments.isNotEmpty(),
-            externalCommentsCount = externalComments.size
-        )
-    }
-
     private fun buildRatingSummary(reviews: List<Review>): RatingSummaryUi {
         val ratings = reviews.mapNotNull { review ->
             review.rating?.toDouble()
@@ -311,36 +245,6 @@ class ListingDetailViewModel(
         )
     }
 
-    fun sendMessage(
-        content: String,
-        onSuccess: () -> Unit,
-        onError: () -> Unit
-    ) {
-        viewModelScope.launch {
-            try {
-                val cleanContent = content.trim()
-
-                if (cleanContent.isBlank()) {
-                    onError()
-                    return@launch
-                }
-
-                val sellerId = (uiState.value as? ListingDetailUiState.Success)
-                    ?.listing
-                    ?.seller_id
-                    ?: return@launch
-
-                repository.sendMessage(sellerId, cleanContent)
-
-                trackFirstMessageSent(cleanContent.length)
-
-                onSuccess()
-            } catch (e: Exception) {
-                onError()
-            }
-        }
-    }
-
     fun markAsSold(
         onComplete: () -> Unit,
         onError: (String) -> Unit = {}
@@ -355,6 +259,8 @@ class ListingDetailViewModel(
             }
 
             try {
+                repository.markAsSoldRemotely(listingId)
+                repository.markAsSoldLocally(listingId)
                 trackTransactionCompleted()
                 loadListing(forceLoading = false)
                 onComplete()

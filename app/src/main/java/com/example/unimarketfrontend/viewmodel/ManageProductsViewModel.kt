@@ -47,7 +47,7 @@ class ManageProductsViewModel(application: Application) : AndroidViewModel(appli
                 val response = repository.getMyListings()
 
                 if (response.isSuccessful) {
-                    // ✅ CORRECCION: El nombre correcto es cacheRemoteListings
+                    // CORRECCION: El nombre correcto es cacheRemoteListings
                     response.body()?.let {
                         // Juntamos ambos para el cache local
                         repository.cacheRemoteListings(it.active + it.sold)
