@@ -12,7 +12,6 @@ import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 import com.example.unimarketfrontend.model.user.User
 import retrofit2.Response
 
-// Clase para manejar el estado dual (Local y Red) de un producto específico
 data class ListingCacheThenNetworkResult(
     val cached: Listing?,
     val remote: Listing?,
@@ -45,7 +44,6 @@ class ListingRepository(
     }
 
     suspend fun refreshById(listingId: Int): Listing? {
-        // Primero intentamos con el endpoint específico (más eficiente)
         return runCatching {
             val response = api.getListingById(listingId)
             if (response.isSuccessful && response.body() != null) {
@@ -56,7 +54,6 @@ class ListingRepository(
             }
             null
         }.getOrNull() ?: run {
-            // Fallback: traer todos los listings e intentar filtrar (menos eficiente pero funciona)
             val response = api.getListings()
             if (!response.isSuccessful || response.body() == null) {
                 throw IllegalStateException("Could not load listing")
@@ -128,8 +125,6 @@ class ListingRepository(
 
     suspend fun getReviews(listingId: Int): Response<List<Review>> = api.getReviewsByListing(listingId)
 
-    suspend fun sendMessage(sellerId: Int, content: String) = api.sendMessageAsBuyer(SendMessageRequest(seller_id = sellerId, content = content))
-
     suspend fun getMyListings() = api.getMyListings()
 
     suspend fun cacheMyListings(listings: MyListingsResponse) {
@@ -141,6 +136,10 @@ class ListingRepository(
         val soldListing = cachedListing.copy(active = false)
         listingDao.upsert(soldListing.toEntity())
         return soldListing
+    }
+
+    suspend fun markAsSoldRemotely(listingId: Int): Response<Unit> {
+        return api.deleteListing(listingId)
     }
 
     suspend fun createListing(request: CreateListingRequest) = api.createListing(request)

@@ -2,8 +2,9 @@ package com.example.unimarketfrontend.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -125,11 +126,18 @@ fun ManageProductsScreen(
                                 )
                             }
                         } else {
-                            LazyColumn(
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = 340.dp),
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = 100.dp)
+                                contentPadding = PaddingValues(bottom = 100.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                items(currentList) { listing ->
+                                items(
+                                    items = currentList,
+                                    key = { it.id },
+                                    contentType = { "listing" }
+                                ) { listing ->
                                     RecentlyAddedCard(
                                         listing = listing,
                                         onClick = { navController.navigate("listingDetail/${listing.id}") }

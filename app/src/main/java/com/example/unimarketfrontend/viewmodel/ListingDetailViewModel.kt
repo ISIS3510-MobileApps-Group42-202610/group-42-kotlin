@@ -13,9 +13,11 @@ import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.ListingCacheThenNetworkResult
 import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.user.User
+import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.model.utils.ErrorTranslator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 sealed class ListingDetailUiState {
@@ -57,12 +59,26 @@ class ListingDetailViewModel(
     val uiState: StateFlow<ListingDetailUiState> = _uiState
 
     private var isLoadingListing = false
+    private var shouldRetryWhenOnline = false
     private var listingViewedTracked = false
     private var chatStartedTracked = false
     private var firstMessageSentTracked = false
+    private var transactionTracked = false
 
     init {
+        observeConnectivity()
         loadListing()
+    }
+
+    private fun observeConnectivity() {
+        viewModelScope.launch {
+            ConnectivityMonitor.isOnline.collectLatest { online ->
+                if (online && shouldRetryWhenOnline && !isLoadingListing) {
+                    shouldRetryWhenOnline = false
+                    loadListing(forceLoading = false)
+                }
+            }
+        }
     }
 
     private fun loadListing(forceLoading: Boolean = true) {
@@ -73,7 +89,7 @@ class ListingDetailViewModel(
         viewModelScope.launch {
             isLoadingListing = true
 
-            if (forceLoading) {
+            if (forceLoading && _uiState.value !is ListingDetailUiState.Success) {
                 _uiState.value = ListingDetailUiState.Loading
             }
 
@@ -92,10 +108,14 @@ class ListingDetailViewModel(
                 emitSuccess(listing)
                 trackListingViewed(listing)
                 trackLoadPerformance(startMs, "success")
+                shouldRetryWhenOnline = false
 
             } catch (e: Exception) {
+                shouldRetryWhenOnline = true
                 val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
-                _uiState.value = ListingDetailUiState.Error(userMessage)
+                if (_uiState.value !is ListingDetailUiState.Success) {
+                    _uiState.value = ListingDetailUiState.Error(userMessage)
+                }
                 trackLoadPerformance(startMs, "exception")
             } finally {
                 isLoadingListing = false
@@ -107,7 +127,7 @@ class ListingDetailViewModel(
         val sellerUserId = listing.owner_user_id ?: listing.seller_id
 
         val seller = runCatching {
-            repository.getSellerInfo(listing.seller_id)
+            repository.getSellerInfo(sellerUserId)
         }.getOrNull()
             ?.takeIf { it.isSuccessful }
             ?.body()
@@ -122,7 +142,7 @@ class ListingDetailViewModel(
         }
 
         val currentUser = runCatching {
-            RetrofitInstance.api.getMe()
+            repository.getMe()
         }.getOrNull()
 
         val reviews = runCatching {
@@ -182,7 +202,7 @@ class ListingDetailViewModel(
         val contactTargetId = if (isOwner) {
             buyer?.id ?: listing.buyer_id
         } else {
-            seller?.id ?: sellerUserId
+            listing.seller_id
         }
 
         val contactTargetName = if (isOwner) {
@@ -293,6 +313,7 @@ class ListingDetailViewModel(
 
             try {
                 repository.markAsSoldLocally(listingId)
+                trackTransactionCompleted()
                 loadListing(forceLoading = false)
                 onComplete()
             } catch (e: Exception) {
@@ -360,9 +381,13 @@ class ListingDetailViewModel(
         rating: Int? = null,
         responseTimeMinutes: Int? = null
     ) {
+        if (transactionTracked) return
+        
         val state = uiState.value as? ListingDetailUiState.Success ?: return
         val listing = state.listing
         val seller = state.seller
+
+        transactionTracked = true
 
          BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
             listingId = listing.id,

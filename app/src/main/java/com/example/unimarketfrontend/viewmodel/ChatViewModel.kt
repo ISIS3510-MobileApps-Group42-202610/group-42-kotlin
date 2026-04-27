@@ -34,13 +34,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _isSending = MutableStateFlow(false)
     val isSending: StateFlow<Boolean> = _isSending
 
+    // Detalles del vendedor asociado al hilo actual
+    private val _sellerDetails = MutableStateFlow<String?>(null)
+    val sellerDetails: StateFlow<String?> = _sellerDetails
+
     // Carga todos los mensajes del hilo con un vendedor específico
     fun loadThread(sellerId: Int) {
         viewModelScope.launch {
             try {
-                // SPRINT 3: Podríamos implementar cache de mensajes por hilo aquí también.
                 val thread = repository.getThread(sellerId)
                 _messages.value = thread
+
+                // Obtener detalles del vendedor del primer mensaje del hilo
+                val sellerName = thread.firstOrNull()?.seller?.user?.let {
+                    "${it.name} ${it.last_name}".trim()
+                } ?: "Vendedor desconocido"
+                _sellerDetails.value = sellerName
 
                 // BQ4: Tiempo de respuesta (Smart Feature)
                 computeAndLogResponseTime(thread, sellerId)

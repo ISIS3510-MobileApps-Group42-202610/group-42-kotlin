@@ -8,6 +8,7 @@ import com.example.unimarketfrontend.model.analytics.PerformanceEventRequest
 import com.example.unimarketfrontend.model.network.api.ApiService
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.network.api.AnalyticsApiService
+import com.example.unimarketfrontend.model.network.client.AnalyticsRetrofitInstance
 import com.example.unimarketfrontend.model.network.interceptor.AnalyticsAuthInterceptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,30 +23,13 @@ import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
 
-object AnalyticsRetrofitInstance {
-    private val client by lazy {
-        OkHttpClient.Builder()
-            .addInterceptor(AnalyticsAuthInterceptor())
-            .build()
-    }
-
-    val api: AnalyticsApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl(AnalyticsConfig.ANALYTICS_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(AnalyticsApiService::class.java)
-    }
-}
-
 interface BusinessAnalyticsRepository {
     suspend fun sendEvent(event: BusinessEventRequest): Result<Unit>
     suspend fun sendPerformance(event: PerformanceEventRequest): Result<Unit>
 }
 
 class DefaultBusinessAnalyticsRepository(
-    private val analyticsApiService: AnalyticsApiService
+    private val analyticsApiService: AnalyticsApiService = AnalyticsRetrofitInstance.api
 ) : BusinessAnalyticsRepository {
 
     override suspend fun sendEvent(event: BusinessEventRequest): Result<Unit> {

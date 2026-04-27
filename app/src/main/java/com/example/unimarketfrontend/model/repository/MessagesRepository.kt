@@ -5,13 +5,21 @@ import com.example.unimarketfrontend.model.local.PendingMessageEntity
 import com.example.unimarketfrontend.model.local.dao.MessagesDao
 import com.example.unimarketfrontend.model.message.Message
 import com.example.unimarketfrontend.model.message.SendMessageRequest
+import com.example.unimarketfrontend.model.network.client.AnalyticsRetrofitInstance
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
+import com.example.unimarketfrontend.model.network.api.AnalyticsApiService
+import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.flow.Flow
 
 class MessagesRepository(
     private val messagesDao: MessagesDao
 ) {
     private val api = RetrofitInstance.api
+    private val analyticsApiService = AnalyticsRetrofitInstance.api
 
     fun observeConversations(): Flow<List<ConversationEntity>> =
         messagesDao.observeConversations()
@@ -71,6 +79,34 @@ class MessagesRepository(
                 content = content
             )
         )
+
+    suspend fun sendBusinessEvent(
+        eventName: String,
+        listingId: Long,
+        buyerUserId: Long?,
+        sellerUserId: Long?,
+        metadata: Map<String, Any?>
+    ): Boolean {
+        return try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+            sdf.timeZone = TimeZone.getTimeZone("UTC")
+            val timestamp = sdf.format(Date())
+
+            val event = BusinessEventRequest(
+                event_name = eventName,
+                listing_id = listingId.toInt(),
+                buyer_user_id = buyerUserId?.toInt(),
+                seller_user_id = sellerUserId?.toInt(),
+                timestamp = timestamp,
+                metadata = metadata,
+                client_event_id = "$eventName-${listingId}-${buyerUserId}-${System.currentTimeMillis()}"
+            )
+            analyticsApiService.sendBusinessEvent(event)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     private fun List<Message>.toConversationEntities(): List<ConversationEntity> {
         return groupBy { message ->
