@@ -16,30 +16,20 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.math.*
 
-/*
- * Helper para el sensor de ubicacion (GPS).
- * SPRINT 3: Ahora detecta edificios especificos para la feature Context-Aware.
- * Incluye la formula de Haversine para calculo de distancia en esfera.
- */
 data class CampusPoint(val name: String, val lat: Double, val lng: Double)
 
 object LocationHelper {
-    
-    // Lista de puntos clave en la Universidad de los Andes
+    // SPRINT 3: Lista extendida con el edificio Civico
     private val universityBuildings = listOf(
         CampusPoint("Mario Laserna (ML)", 4.6013, -74.0657),
         CampusPoint("Edificio SD", 4.6025, -74.0650),
         CampusPoint("Edificio W", 4.6010, -74.0665),
+        CampusPoint("Edificio Cívico", 4.6008, -74.0668), // Nuevo: Civico
         CampusPoint("Edificio Au", 4.6020, -74.0645),
         CampusPoint("Biblioteca General", 4.6005, -74.0660)
     )
 
-    // Funcion original para compatibilidad con pantallas existentes
-    suspend fun isOnCampus(context: Context): Boolean {
-        return getNearbyBuilding(context) != null
-    }
-
-    // Funcion "Smart": te dice en que edificio estas exactamente
+    // SMART FEATURE: Ahora busca el edificio MAS CERCANO, no el primero
     suspend fun getNearbyBuilding(context: Context): String? = withContext(Dispatchers.IO) {
         if (!hasPermission(context)) return@withContext null
 
@@ -48,10 +38,11 @@ object LocationHelper {
         } ?: getLastLocation(context)
 
         location?.let { loc ->
-            // Si estas a menos de 150 metros de algun edificio, lo detectamos
-            universityBuildings.firstOrNull { building ->
-                haversine(loc.latitude, loc.longitude, building.lat, building.lng) <= 150.0
-            }?.name
+            universityBuildings
+                .map { it to haversine(loc.latitude, loc.longitude, it.lat, it.lng) }
+                .filter { it.second <= 120.0 } // Radio de 120 metros para mayor precision
+                .minByOrNull { it.second } // Tomamos el mas cercano
+                ?.first?.name
         }
     }
 
@@ -76,9 +67,8 @@ object LocationHelper {
             .addOnFailureListener { if (cont.isActive) cont.resume(null) }
     }
 
-    // Formula de Haversine para calcular distancia real en metros sobre la Tierra
     private fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val r = 6371000.0 
+        val r = 6371000.0
         val dLat = Math.toRadians(lat2 - lat1)
         val dLng = Math.toRadians(lng2 - lng1)
         val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2).pow(2)
