@@ -124,11 +124,13 @@ fun ListingDetailScreen(
             var selectedImageIndex by remember { mutableIntStateOf(0) }
             val images = listing.images.orEmpty()
 
+            var errorText by remember { mutableStateOf<String?>(null) } // ✅ Nuevo estado para el error
+
             if (showMessageDialog) {
                 AlertDialog(
                     onDismissRequest = {
                         showMessageDialog = false
-                        messageError = null
+                        errorText = null
                     },
                     title = { Text("Enviar mensaje") },
                     text = {
@@ -137,17 +139,18 @@ fun ListingDetailScreen(
                                 value = messageText,
                                 onValueChange = {
                                     messageText = it
-                                    messageError = null
+                                    errorText = null // Limpiamos error al escribir
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                label = { Text("Mensaje") }
+                                label = { Text("Mensaje") },
+                                isError = errorText != null
                             )
-                            if (!messageError.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                            if (errorText != null) {
                                 Text(
-                                    text = messageError.orEmpty(),
+                                    text = errorText!!,
                                     color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
                         }
@@ -155,24 +158,23 @@ fun ListingDetailScreen(
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                val recipientId = contactTargetId
-                                if (messageText.isNotBlank() && recipientId != null) {
+                                if (messageText.isNotBlank()) {
                                     vm.sendFirstMessage(
-                                        recipientUserId = recipientId,
+                                        recipientUserId = listing.seller_id,
                                         content = messageText,
                                         onComplete = {
-                                            showMessageDialog = false
                                             messageText = ""
-                                            messageError = null
-                                            navController.navigate(ChatRoutesFactory.chatPath(recipientId, contactTargetName))
+                                            showMessageDialog = false
+                                            errorText = null
+                                            // Navegamos al chat bilateral
+                                            navController.navigate("chat/${listing.seller_id}/${seller?.name ?: "Vendedor"}")
                                         },
                                         onError = { error ->
-                                            messageError = error
+                                            errorText = error //  Mostramos el error real
                                         }
                                     )
                                 }
-                            },
-                            enabled = contactTargetId != null
+                            }
                         ) { Text("Enviar") }
                     },
                     dismissButton = {

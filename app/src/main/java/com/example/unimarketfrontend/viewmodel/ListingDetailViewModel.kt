@@ -2,12 +2,12 @@ package com.example.unimarketfrontend.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Review
-import com.example.unimarketfrontend.model.message.SendMessageRequest
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.ListingCacheThenNetworkResult
@@ -44,6 +44,17 @@ sealed class ListingDetailUiState {
 data class RatingSummaryUi(
     val average: Double,
     val count: Int
+)
+
+private data class ListingDetailActionState(
+    val sellerDisplayName: String,
+    val contactTargetId: Int?,
+    val contactTargetName: String?,
+    val contactActionLabel: String,
+    val isOwner: Boolean,
+    val canMarkAsSold: Boolean,
+    val hasExternalComments: Boolean,
+    val externalCommentsCount: Int
 )
 
 class ListingDetailViewModel(
@@ -109,13 +120,15 @@ class ListingDetailViewModel(
                 trackListingViewed(listing)
                 trackLoadPerformance(startMs, "success")
                 shouldRetryWhenOnline = false
-
             } catch (e: Exception) {
                 shouldRetryWhenOnline = true
+
                 val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
+
                 if (_uiState.value !is ListingDetailUiState.Success) {
                     _uiState.value = ListingDetailUiState.Error(userMessage)
                 }
+
                 trackLoadPerformance(startMs, "exception")
             } finally {
                 isLoadingListing = false
@@ -235,7 +248,9 @@ class ListingDetailViewModel(
     }
 
     private fun buildRatingSummary(reviews: List<Review>): RatingSummaryUi {
-        val ratings = reviews.mapNotNull { it.rating?.toDouble() }
+        val ratings = reviews.mapNotNull { review ->
+            review.rating?.toDouble()
+        }
 
         return RatingSummaryUi(
             average = if (ratings.isEmpty()) 0.0 else ratings.average(),
@@ -296,23 +311,50 @@ class ListingDetailViewModel(
         )
     }
 
-    fun markAsSold(onComplete: () -> Unit, onError: (String) -> Unit = {}) {
+    fun sendMessage(
+        content: String,
+        onSuccess: () -> Unit,
+        onError: () -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val cleanContent = content.trim()
+
+                if (cleanContent.isBlank()) {
+                    onError()
+                    return@launch
+                }
+
+                val sellerId = (uiState.value as? ListingDetailUiState.Success)
+                    ?.listing
+                    ?.seller_id
+                    ?: return@launch
+
+                repository.sendMessage(sellerId, cleanContent)
+
+                trackFirstMessageSent(cleanContent.length)
+
+                onSuccess()
+            } catch (e: Exception) {
+                onError()
+            }
+        }
+    }
+
+    fun markAsSold(
+        onComplete: () -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
             val currentState = _uiState.value as? ListingDetailUiState.Success
                 ?: return@launch onError("No se pudo actualizar la publicación")
 
-            if (!currentState.isOwner) {
-                onError("Solo el vendedor puede marcarla como vendida")
-                return@launch
-            }
-
             if (!currentState.canMarkAsSold) {
-                onError("La publicación ya no está activa")
+                onError("Esta publicación no se puede marcar como vendida")
                 return@launch
             }
 
             try {
-                repository.markAsSoldLocally(listingId)
                 trackTransactionCompleted()
                 loadListing(forceLoading = false)
                 onComplete()
@@ -322,16 +364,11 @@ class ListingDetailViewModel(
         }
     }
 
-    fun deleteListing(onComplete: () -> Unit, onError: (String) -> Unit = {}) {
+    fun deleteListing(
+        onComplete: () -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
-            val currentState = _uiState.value as? ListingDetailUiState.Success
-                ?: return@launch onError("No se pudo obtener el estado actual")
-
-            if (!currentState.isOwner) {
-                onError("Solo el dueño puede eliminar la publicación")
-                return@launch
-            }
-
             try {
                 val response = repository.deleteListing(listingId)
 
@@ -361,15 +398,11 @@ class ListingDetailViewModel(
                     return@launch
                 }
 
-                val request = SendMessageRequest(
-                    seller_id = recipientUserId,
-                    content = cleanContent
-                )
+                repository.sendMessage(recipientUserId, cleanContent)
 
-                repository.sendMessage(request)
                 trackFirstMessageSent(cleanContent.length)
-                onComplete()
 
+                onComplete()
             } catch (e: Exception) {
                 val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
                 onError(userMessage)
@@ -382,14 +415,14 @@ class ListingDetailViewModel(
         responseTimeMinutes: Int? = null
     ) {
         if (transactionTracked) return
-        
+
         val state = uiState.value as? ListingDetailUiState.Success ?: return
         val listing = state.listing
         val seller = state.seller
 
         transactionTracked = true
 
-         BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
+        BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
             listingId = listing.id,
             sellerId = listing.seller_id,
             metadata = mapOf(
@@ -400,8 +433,7 @@ class ListingDetailViewModel(
                 "semester" to (seller?.semester?.toString() ?: "unknown"),
                 "seller_id" to listing.seller_id.toString(),
                 "rating" to (rating ?: 0).toString(),
-                "response_time_minutes" to (responseTimeMinutes ?: 0).toString(),
-                "seeded_bq5" to "false"
+                "response_time_minutes" to (responseTimeMinutes ?: 0).toString()
             )
         )
     }
@@ -411,7 +443,8 @@ class ListingDetailViewModelFactory(
     private val application: Application,
     private val listingId: Int
 ) : ViewModelProvider.Factory {
-    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ListingDetailViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return ListingDetailViewModel(application, listingId) as T

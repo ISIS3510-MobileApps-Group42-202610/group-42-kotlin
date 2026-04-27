@@ -16,92 +16,72 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.math.*
 
-
-// Coordenadas del centro de la Universidad y el radio de deteccion (600 metros)
-private const val CAMPUS_LAT = 4.6013
-private const val CAMPUS_LNG = -74.0657
-private const val CAMPUS_RADIUS_METERS = 600.0
-
+/*
+ * Helper para el sensor de ubicacion (GPS).
+ * SPRINT 3: Ahora detecta edificios especificos para la feature Context-Aware.
+ * Incluye la formula de Haversine para calculo de distancia en esfera.
+ */
+data class CampusPoint(val name: String, val lat: Double, val lng: Double)
 
 object LocationHelper {
+    
+    // Lista de puntos clave en la Universidad de los Andes
+    private val universityBuildings = listOf(
+        CampusPoint("Mario Laserna (ML)", 4.6013, -74.0657),
+        CampusPoint("Edificio SD", 4.6025, -74.0650),
+        CampusPoint("Edificio W", 4.6010, -74.0665),
+        CampusPoint("Edificio Au", 4.6020, -74.0645),
+        CampusPoint("Biblioteca General", 4.6005, -74.0660)
+    )
 
-    // Funcion principal que nos dice si el usuario esta en la U o no
-    // Es suspend porque el GPS puede tardar en responder y no queremos trabar la app
-    suspend fun isOnCampus(context: Context): Boolean = withContext(Dispatchers.IO) {
-        // Primero chequeamos si tenemos permiso, si no, ni lo intentamos
-        if (!hasPermission(context)) return@withContext false
+    // Funcion original para compatibilidad con pantallas existentes
+    suspend fun isOnCampus(context: Context): Boolean {
+        return getNearbyBuilding(context) != null
+    }
 
-        // Intentamos sacar la ubicacion actual, pero solo esperamos 5 segundos
-        // Si en 5 segundos el GPS no responde, saltamos al plan B (ultima ubicacion conocida)
+    // Funcion "Smart": te dice en que edificio estas exactamente
+    suspend fun getNearbyBuilding(context: Context): String? = withContext(Dispatchers.IO) {
+        if (!hasPermission(context)) return@withContext null
+
         val location = withTimeoutOrNull(5000) {
             getCurrentLocation(context)
         } ?: getLastLocation(context)
 
-        // Si logramos sacar la posicion, calculamos la distancia usando Haversine
-        location?.let {
-            val distance = haversine(it.latitude, it.longitude, CAMPUS_LAT, CAMPUS_LNG)
-            distance <= CAMPUS_RADIUS_METERS
-        } ?: false
+        location?.let { loc ->
+            // Si estas a menos de 150 metros de algun edificio, lo detectamos
+            universityBuildings.firstOrNull { building ->
+                haversine(loc.latitude, loc.longitude, building.lat, building.lng) <= 150.0
+            }?.name
+        }
     }
 
-    // Funcion basica para ver si el usuario ya nos dio permiso de usar el GPS
     fun hasPermission(context: Context): Boolean =
-        ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    // Esta funcion pide la posicion exacta al sensor GPS en este preciso momento
     @SuppressLint("MissingPermission")
-    private suspend fun getCurrentLocation(context: Context): Location? =
-        suspendCancellableCoroutine { cont ->
-            val client = LocationServices.getFusedLocationProviderClient(context)
-            val cts = CancellationTokenSource()
+    private suspend fun getCurrentLocation(context: Context): Location? = suspendCancellableCoroutine { cont ->
+        val client = LocationServices.getFusedLocationProviderClient(context)
+        val cts = CancellationTokenSource()
+        client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+            .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
+            .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+        cont.invokeOnCancellation { cts.cancel() }
+    }
 
-            // Pedimos ubicacion de alta precision
-            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-                .addOnSuccessListener { location: Location? ->
-                    if (cont.isActive) cont.resume(location)
-                }
-                .addOnFailureListener {
-                    if (cont.isActive) cont.resume(null)
-                }
-
-            // Si el usuario cierra la pantalla mientras buscamos, cancelamos la peticion
-            cont.invokeOnCancellation { cts.cancel() }
-        }
-
-    // Plan B: saca la ultima posicion que el celular guardo en cache (es instantaneo)
     @SuppressLint("MissingPermission")
-    private suspend fun getLastLocation(context: Context): Location? =
-        suspendCancellableCoroutine { cont ->
-            val client = LocationServices.getFusedLocationProviderClient(context)
-            client.lastLocation
-                .addOnSuccessListener { location: Location? ->
-                    if (cont.isActive) cont.resume(location)
-                }
-                .addOnFailureListener {
-                    if (cont.isActive) cont.resume(null)
-                }
-        }
+    private suspend fun getLastLocation(context: Context): Location? = suspendCancellableCoroutine { cont ->
+        val client = LocationServices.getFusedLocationProviderClient(context)
+        client.lastLocation
+            .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
+            .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+    }
 
-    /**
-     * Haversine formula. Giving great-circle distances between two points on a sphere from their longitudes and latitudes.
-     * It is a special case of a more general formula in spherical trigonometry, the law of haversines, relating the
-     * sides and angles of spherical "triangles".
-     *
-     * https://rosettacode.org/wiki/Haversine_formula#Java
-     *
-     * @return Distance in kilometers
-     */
-
-
-    // use también el repo https://gist.github.com/jferrao/cb44d09da234698a7feee68ca895f491 para calcular esta función
+    // Formula de Haversine para calcular distancia real en metros sobre la Tierra
     private fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val r = 6_371_000.0
+        val r = 6371000.0 
         val dLat = Math.toRadians(lat2 - lat1)
         val dLng = Math.toRadians(lng2 - lng1)
-        val a = sin(dLat / 2).pow(2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2).pow(2)
+        val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2).pow(2)
         return r * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 }

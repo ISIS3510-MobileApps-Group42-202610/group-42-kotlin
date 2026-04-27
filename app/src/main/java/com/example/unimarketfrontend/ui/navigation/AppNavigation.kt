@@ -10,7 +10,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.unimarketfrontend.model.utils.analytics.PerformanceTrackerProvider
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
-import com.example.unimarketfrontend.ui.screens.ChatScreen
+import com.example.unimarketfrontend.ui.navigation.ChatRoutesFactory
+import com.example.unimarketfrontend.ui.screens.SearchScreen
 import com.example.unimarketfrontend.ui.screens.CreateListingScreen
 import com.example.unimarketfrontend.ui.screens.ForgotPasswordScreen
 import com.example.unimarketfrontend.ui.screens.HomeScreen
@@ -20,8 +21,8 @@ import com.example.unimarketfrontend.ui.screens.ManageProductsScreen
 import com.example.unimarketfrontend.ui.screens.MessagesScreen
 import com.example.unimarketfrontend.ui.screens.ProfileScreen
 import com.example.unimarketfrontend.ui.screens.RegisterScreen
-import com.example.unimarketfrontend.ui.screens.SearchScreen
-
+import com.example.unimarketfrontend.ui.screens.*
+import com.example.unimarketfrontend.ui.navigation.ListingRoutesFactory
 @Composable
 fun AppNavigation() {
     var isLoggedIn by remember { mutableStateOf(RetrofitInstance.isLoggedIn()) }

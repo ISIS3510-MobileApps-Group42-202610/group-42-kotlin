@@ -2,8 +2,11 @@ package com.example.unimarketfrontend.model.local.dao
 
 import androidx.room.*
 import com.example.unimarketfrontend.model.local.ConversationEntity
+import com.example.unimarketfrontend.model.local.MessageEntity
 import com.example.unimarketfrontend.model.local.PendingMessageEntity
 import kotlinx.coroutines.flow.Flow
+import com.example.unimarketfrontend.model.message.Message
+import com.example.unimarketfrontend.model.repository.MessagesRepository
 
 /*
  * Data Access Object (DAO) para el modulo de mensajeria.
@@ -40,4 +43,13 @@ interface MessagesDao {
 
     @Query("SELECT COUNT(*) FROM pending_messages")
     suspend fun countPending(): Int
+
+    @Query("SELECT * FROM messages WHERE conversationWithId = :otherId ORDER BY createdAt ASC")
+    fun observeMessages(otherId: Int): Flow<List<MessageEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessages(messages: List<MessageEntity>)
+
+    @Query("DELETE FROM messages WHERE conversationWithId = :otherId")
+    suspend fun clearMessagesWith(otherId: Int)
 }
