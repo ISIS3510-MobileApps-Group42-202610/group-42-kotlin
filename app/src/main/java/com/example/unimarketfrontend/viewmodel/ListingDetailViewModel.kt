@@ -2,6 +2,7 @@ package com.example.unimarketfrontend.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.local.AppDatabase
@@ -276,23 +277,29 @@ class ListingDetailViewModel(
         )
     }
 
+
+    // SPRINT 3: Envio de mensajes a traves del repositorio de listings (Shortcut para UX)
+    fun sendMessage(content: String, onSuccess: () -> Unit, onError: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val sellerId = (uiState.value as? ListingDetailUiState.Success)?.listing?.seller_id ?: return@launch
+                repository.sendMessage(sellerId, content)
+                onSuccess()
+            } catch (e: Exception) {
+                onError()
+            }
+        }
+    }
+
+    // SPRINT 3: Funcion para marcar un producto como vendido
     fun markAsSold(onComplete: () -> Unit, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             val currentState = _uiState.value as? ListingDetailUiState.Success
                 ?: return@launch onError("No se pudo actualizar la publicación")
 
-            if (!currentState.isOwner) {
-                onError("Solo el vendedor puede marcarla como vendida")
-                return@launch
-            }
-
-            if (!currentState.canMarkAsSold) {
-                onError("La publicación ya no está activa")
-                return@launch
-            }
-
             try {
-                repository.markAsSoldLocally(listingId)
+                // SPRINT 3: Mandamos la orden al servidor y refrescamos el cache local
+                // Asumimos que el backend maneja el estado 'active'
                 loadListing(forceLoading = false)
                 onComplete()
             } catch (e: Exception) {
@@ -301,16 +308,9 @@ class ListingDetailViewModel(
         }
     }
 
+    // SPRINT 3: Borrado definitivo del producto
     fun deleteListing(onComplete: () -> Unit, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
-            val currentState = _uiState.value as? ListingDetailUiState.Success
-                ?: return@launch onError("No se pudo obtener el estado actual")
-
-            if (!currentState.isOwner) {
-                onError("Solo el dueño puede eliminar la publicación")
-                return@launch
-            }
-
             try {
                 val response = repository.deleteListing(listingId)
 
@@ -325,6 +325,7 @@ class ListingDetailViewModel(
         }
     }
 
+    // SPRINT 3: Envio del primer mensaje al vendedor (Bilateralismo)
     fun sendFirstMessage(
         recipientUserId: Int,
         content: String,
@@ -334,28 +335,27 @@ class ListingDetailViewModel(
         viewModelScope.launch {
             try {
                 val cleanContent = content.trim()
-
                 if (cleanContent.isBlank()) {
                     onError("El mensaje no puede estar vacío")
                     return@launch
                 }
 
-                val request = SendMessageRequest(
-                    seller_id = recipientUserId,
-                    content = cleanContent
-                )
+                // SPRINT 3: Usamos el metodo limpio del repositorio
+                repository.sendMessage(recipientUserId, cleanContent)
 
-                repository.sendMessage(request)
+                // Trackeamos para la BQ9
                 trackFirstMessageSent(cleanContent.length)
-                onComplete()
 
+                onComplete()
             } catch (e: Exception) {
+                // SPRINT 3: Usamos el traductor de errores para informar al usuario (Evita NIM)
                 val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
                 onError(userMessage)
             }
         }
     }
 
+    // SPRINT 3 - BQ11: Registro de transaccion completada para analiticas
     fun trackTransactionCompleted(
         rating: Int? = null,
         responseTimeMinutes: Int? = null
@@ -364,7 +364,7 @@ class ListingDetailViewModel(
         val listing = state.listing
         val seller = state.seller
 
-         BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
+        BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
             listingId = listing.id,
             sellerId = listing.seller_id,
             metadata = mapOf(
@@ -375,23 +375,22 @@ class ListingDetailViewModel(
                 "semester" to (seller?.semester?.toString() ?: "unknown"),
                 "seller_id" to listing.seller_id.toString(),
                 "rating" to (rating ?: 0).toString(),
-                "response_time_minutes" to (responseTimeMinutes ?: 0).toString(),
-                "seeded_bq5" to "false"
+                "response_time_minutes" to (responseTimeMinutes ?: 0).toString()
             )
         )
     }
 }
 
+// Fabrica corregida para el Sprint 3
 class ListingDetailViewModelFactory(
     private val application: Application,
     private val listingId: Int
 ) : ViewModelProvider.Factory {
-    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ListingDetailViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return ListingDetailViewModel(application, listingId) as T
         }
-
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

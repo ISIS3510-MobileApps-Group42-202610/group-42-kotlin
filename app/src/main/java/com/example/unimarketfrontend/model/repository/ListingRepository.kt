@@ -12,18 +12,28 @@ import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 import com.example.unimarketfrontend.model.user.User
 import retrofit2.Response
 
-// Clase para manejar el estado dual (Local y Red) de un producto específico
+/*
+ * Clase de resultado dual para la estrategia Cache-then-Network.
+ * Permite que la UI reciba el cache rapido y luego la actualizacion de red.
+ */
 data class ListingCacheThenNetworkResult(
     val cached: Listing?,
     val remote: Listing?,
     val networkError: Throwable?
 )
 
+/*
+ * Repositorio Maestro de Listings.
+ * SPRINT 3: Actua como una Fachada (Facade) para ocultar la complejidad de red y DB.
+ */
 class ListingRepository(
-    private val api: ApiService = RetrofitInstance.api,
-    private val listingDao: ListingDao
+    private val listingDao: ListingDao,
+    private val api: ApiService = RetrofitInstance.api
 ) {
 
+    // --- LOGICA DE SINCRONIZACION Y PERSISTENCIA ---
+
+    // Evitamos el antipatron de inconsistencia: si un listing es localmente 'sold', no lo revivimos
     private suspend fun preserveLocalInactiveState(remoteListing: Listing): Listing {
         val cached = listingDao.getById(remoteListing.id)
         return if (cached != null && !cached.active) {
@@ -33,6 +43,7 @@ class ListingRepository(
         }
     }
 
+    // Guarda una lista de listings en Room de forma segura
     suspend fun cacheRemoteListings(listings: List<Listing>) {
         val mergedListings = listings.map { preserveLocalInactiveState(it) }
         if (mergedListings.isNotEmpty()) {
@@ -40,12 +51,24 @@ class ListingRepository(
         }
     }
 
+    // --- CONSULTAS DE CACHE (Local Storage) ---
+
     suspend fun getCachedById(listingId: Int): Listing? {
         return listingDao.getById(listingId)?.toListing()
     }
 
+    suspend fun getCachedActiveListings(): List<Listing> {
+        return listingDao.getActive().map { it.toListing() }
+    }
+
+    suspend fun getCachedSoldListings(): List<Listing> {
+        return listingDao.getAll().filter { !it.active }.map { it.toListing() }
+    }
+
+    // --- LLAMADAS DE RED (Network Layer) ---
+
     suspend fun refreshById(listingId: Int): Listing? {
-        // Primero intentamos con el endpoint específico (más eficiente)
+        // Intento 1: Endpoint especifico por ID
         return runCatching {
             val response = api.getListingById(listingId)
             if (response.isSuccessful && response.body() != null) {
@@ -56,60 +79,39 @@ class ListingRepository(
             }
             null
         }.getOrNull() ?: run {
-            // Fallback: traer todos los listings e intentar filtrar (menos eficiente pero funciona)
+            // Fallback: Busqueda manual en la lista global (en caso de que falle el endpoint /id)
             val response = api.getListings()
-            if (!response.isSuccessful || response.body() == null) {
-                throw IllegalStateException("Could not load listing")
-            }
-
             val remoteListing = response.body()?.firstOrNull { it.id == listingId } ?: return null
             val mergedListing = preserveLocalInactiveState(remoteListing)
-
             listingDao.upsert(mergedListing.toEntity())
             return mergedListing
         }
     }
 
-    suspend fun getByIdCacheThenNetwork(listingId: Int): ListingCacheThenNetworkResult {
-        val cached = getCachedById(listingId)
-        return try {
-            val remote = refreshById(listingId)
-            ListingCacheThenNetworkResult(
-                cached = cached,
-                remote = remote,
-                networkError = null
-            )
-        } catch (e: Exception) {
-            ListingCacheThenNetworkResult(
-                cached = cached,
-                remote = null,
-                networkError = e
-            )
-        }
-    }
-
-
     suspend fun refreshHomeData(): HomeResponseDto {
         val remote = api.getHomeRanking()
+        // Procesamos tendencias y recientes para guardarlos en Room
         val allRemoteListings = (remote.trending + remote.recent).distinctBy { it.id }
-        val mergedListings = allRemoteListings.map { preserveLocalInactiveState(it) }
+        cacheRemoteListings(allRemoteListings)
 
-        if (mergedListings.isNotEmpty()) {
-            listingDao.upsertAll(mergedListings.toEntities())
-        }
         return remote.copy(
             trending = remote.trending.map { preserveLocalInactiveState(it) },
             recent = remote.recent.map { preserveLocalInactiveState(it) }
         )
     }
 
-    suspend fun getCachedActiveListings(): List<Listing> {
-        return listingDao.getActive().map { it.toListing() }
+    // Implementacion completa de Cache-then-Network (Ch. 10 del libro)
+    suspend fun getByIdCacheThenNetwork(listingId: Int): ListingCacheThenNetworkResult {
+        val cached = getCachedById(listingId)
+        return try {
+            val remote = refreshById(listingId)
+            ListingCacheThenNetworkResult(cached, remote, null)
+        } catch (e: Exception) {
+            ListingCacheThenNetworkResult(cached, null, e)
+        }
     }
 
-    suspend fun getCachedSoldListings(): List<Listing> {
-        return listingDao.getAll().filter { !it.active }.map { it.toListing() }
-    }
+    // --- INTEGRACION CON BUSQUEDA ---
 
     suspend fun searchListings() = api.getListings()
 
@@ -122,36 +124,24 @@ class ListingRepository(
         return getCachedActiveListings()
     }
 
+    // --- SERVICIOS EXTERNOS Y OTROS ---
+
     suspend fun getSellerInfo(userId: Int): Response<User> = api.getUserById(userId)
 
     suspend fun getMe(): User = api.getMe()
 
     suspend fun getReviews(listingId: Int): Response<List<Review>> = api.getReviewsByListing(listingId)
 
-    suspend fun sendMessage(sellerId: Int, content: String) = api.sendMessageAsBuyer(SendMessageRequest(seller_id = sellerId, content = content))
-
     suspend fun getMyListings() = api.getMyListings()
 
-    suspend fun cacheMyListings(listings: MyListingsResponse) {
-        cacheRemoteListings(listings.active + listings.sold)
-    }
-
-    suspend fun markAsSoldLocally(listingId: Int): Listing? {
-        val cachedListing = listingDao.getById(listingId)?.toListing() ?: return null
-        val soldListing = cachedListing.copy(active = false)
-        listingDao.upsert(soldListing.toEntity())
-        return soldListing
-    }
+    // Envio de mensajes a traves del repositorio de listings (Shortcut para UX)
+    suspend fun sendMessage(sellerId: Int, content: String) =
+        api.sendMessageAsBuyer(SendMessageRequest(seller_id = sellerId, content = content))
 
     suspend fun createListing(request: CreateListingRequest) = api.createListing(request)
 
     suspend fun deleteListing(listingId: Int): Response<Unit> = api.deleteListing(listingId)
 
-    suspend fun addListingImage(listingId: Int, request: AddImageRequest) =
-        api.addListingImage(listingId, request)
-
     suspend fun getCloudinarySignature(request: CloudinarySignatureRequest) =
         api.getCloudinarySignature(request)
-
-    suspend fun sendMessage(request: SendMessageRequest) = api.sendMessageAsBuyer(request)
 }

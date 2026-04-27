@@ -85,14 +85,24 @@ interface ApiService {
         @Body request: AddImageRequest
     ): Response<ListingImage>
 
+    // Messages
     @GET("api/v1/messages/as-buyer")
     suspend fun getMessagesAsBuyer(): List<Message>
+
+    @GET("api/v1/messages/as-seller")
+    suspend fun getMessagesAsSeller(): List<Message>
 
     @GET("api/v1/messages/thread/seller/{sellerId}")
     suspend fun getThread(@Path("sellerId") sellerId: Int): List<Message>
 
+    @GET("api/v1/messages/thread/buyer/{buyerId}")
+    suspend fun getThreadAsSeller(@Path("buyerId") buyerId: Int): List<Message>
+
     @POST("api/v1/messages/buyer")
     suspend fun sendMessageAsBuyer(@Body request: SendMessageRequest): Message
+
+    @POST("api/v1/messages/seller")
+    suspend fun sendMessageAsSeller(@Body request: Map<String, Any>): Message
 
     @PATCH("api/v1/messages/{id}/read")
     suspend fun markAsRead(@Path("id") messageId: Int)

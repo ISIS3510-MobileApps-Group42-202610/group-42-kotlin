@@ -47,28 +47,29 @@ class ManageProductsViewModel(application: Application) : AndroidViewModel(appli
                 val response = repository.getMyListings()
 
                 if (response.isSuccessful) {
-                    response.body()?.let { repository.cacheMyListings(it) }
+                    // ✅ CORRECCION: El nombre correcto es cacheRemoteListings
+                    response.body()?.let {
+                        // Juntamos ambos para el cache local
+                        repository.cacheRemoteListings(it.active + it.sold)
+                    }
 
-                    // Ajustamos el filtro para usar owner_user_id si está presente, 
-                    // de lo contrario usamos seller_id (retrocompatibilidad)
+                    // Ajustamos el filtro para usar owner_user_id si está presente
                     val allActive = repository.getCachedActiveListings()
                     val allSold = repository.getCachedSoldListings()
 
                     _state.value = ManageProductsState.Success(
-                        active = allActive.filter { 
-                            (it.owner_user_id ?: it.seller_id) == currentUser.id 
+                        active = allActive.filter {
+                            (it.owner_user_id ?: it.seller_id) == currentUser.id
                         },
-                        sold = allSold.filter { 
-                            (it.owner_user_id ?: it.seller_id) == currentUser.id 
+                        sold = allSold.filter {
+                            (it.owner_user_id ?: it.seller_id) == currentUser.id
                         }
                     )
                 } else {
-                    val userMessage = ErrorTranslator.getUserFriendlyMessage(null)
-                    _state.value = ManageProductsState.Error(userMessage)
+                    _state.value = ManageProductsState.Error("No se pudieron cargar tus productos")
                 }
             } catch (e: Exception) {
-                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
-                _state.value = ManageProductsState.Error(userMessage)
+                _state.value = ManageProductsState.Error(ErrorTranslator.getUserFriendlyMessage(e))
             }
         }
     }
