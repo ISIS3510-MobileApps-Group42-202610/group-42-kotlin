@@ -138,6 +138,10 @@ class ListingRepository(
     suspend fun sendMessage(sellerId: Int, content: String) =
         api.sendMessageAsBuyer(SendMessageRequest(seller_id = sellerId, content = content))
 
+    suspend fun markAsSoldRemotely(listingId: Int): Response<Unit> {
+        return api.deleteListing(listingId)
+    }
+
     suspend fun createListing(request: CreateListingRequest) = api.createListing(request)
 
     suspend fun deleteListing(listingId: Int): Response<Unit> = api.deleteListing(listingId)

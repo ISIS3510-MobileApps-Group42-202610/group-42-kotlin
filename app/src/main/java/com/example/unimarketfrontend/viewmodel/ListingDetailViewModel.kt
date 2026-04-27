@@ -8,15 +8,16 @@ import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Review
-import com.example.unimarketfrontend.model.message.SendMessageRequest
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.ListingCacheThenNetworkResult
 import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.user.User
+import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.model.utils.ErrorTranslator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 sealed class ListingDetailUiState {
@@ -45,6 +46,17 @@ data class RatingSummaryUi(
     val count: Int
 )
 
+private data class ListingDetailActionState(
+    val sellerDisplayName: String,
+    val contactTargetId: Int?,
+    val contactTargetName: String?,
+    val contactActionLabel: String,
+    val isOwner: Boolean,
+    val canMarkAsSold: Boolean,
+    val hasExternalComments: Boolean,
+    val externalCommentsCount: Int
+)
+
 class ListingDetailViewModel(
     application: Application,
     private val listingId: Int
@@ -58,12 +70,26 @@ class ListingDetailViewModel(
     val uiState: StateFlow<ListingDetailUiState> = _uiState
 
     private var isLoadingListing = false
+    private var shouldRetryWhenOnline = false
     private var listingViewedTracked = false
     private var chatStartedTracked = false
     private var firstMessageSentTracked = false
+    private var transactionTracked = false
 
     init {
+        observeConnectivity()
         loadListing()
+    }
+
+    private fun observeConnectivity() {
+        viewModelScope.launch {
+            ConnectivityMonitor.isOnline.collectLatest { online ->
+                if (online && shouldRetryWhenOnline && !isLoadingListing) {
+                    shouldRetryWhenOnline = false
+                    loadListing(forceLoading = false)
+                }
+            }
+        }
     }
 
     private fun loadListing(forceLoading: Boolean = true) {
@@ -74,7 +100,7 @@ class ListingDetailViewModel(
         viewModelScope.launch {
             isLoadingListing = true
 
-            if (forceLoading) {
+            if (forceLoading && _uiState.value !is ListingDetailUiState.Success) {
                 _uiState.value = ListingDetailUiState.Loading
             }
 
@@ -93,10 +119,16 @@ class ListingDetailViewModel(
                 emitSuccess(listing)
                 trackListingViewed(listing)
                 trackLoadPerformance(startMs, "success")
-
+                shouldRetryWhenOnline = false
             } catch (e: Exception) {
+                shouldRetryWhenOnline = true
+
                 val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
-                _uiState.value = ListingDetailUiState.Error(userMessage)
+
+                if (_uiState.value !is ListingDetailUiState.Success) {
+                    _uiState.value = ListingDetailUiState.Error(userMessage)
+                }
+
                 trackLoadPerformance(startMs, "exception")
             } finally {
                 isLoadingListing = false
@@ -108,7 +140,7 @@ class ListingDetailViewModel(
         val sellerUserId = listing.owner_user_id ?: listing.seller_id
 
         val seller = runCatching {
-            repository.getSellerInfo(listing.seller_id)
+            repository.getSellerInfo(sellerUserId)
         }.getOrNull()
             ?.takeIf { it.isSuccessful }
             ?.body()
@@ -123,7 +155,7 @@ class ListingDetailViewModel(
         }
 
         val currentUser = runCatching {
-            RetrofitInstance.api.getMe()
+            repository.getMe()
         }.getOrNull()
 
         val reviews = runCatching {
@@ -183,7 +215,7 @@ class ListingDetailViewModel(
         val contactTargetId = if (isOwner) {
             buyer?.id ?: listing.buyer_id
         } else {
-            seller?.id ?: sellerUserId
+            listing.seller_id
         }
 
         val contactTargetName = if (isOwner) {
@@ -216,7 +248,9 @@ class ListingDetailViewModel(
     }
 
     private fun buildRatingSummary(reviews: List<Review>): RatingSummaryUi {
-        val ratings = reviews.mapNotNull { it.rating?.toDouble() }
+        val ratings = reviews.mapNotNull { review ->
+            review.rating?.toDouble()
+        }
 
         return RatingSummaryUi(
             average = if (ratings.isEmpty()) 0.0 else ratings.average(),
@@ -277,13 +311,29 @@ class ListingDetailViewModel(
         )
     }
 
-
-    // SPRINT 3: Envio de mensajes a traves del repositorio de listings (Shortcut para UX)
-    fun sendMessage(content: String, onSuccess: () -> Unit, onError: () -> Unit) {
+    fun sendMessage(
+        content: String,
+        onSuccess: () -> Unit,
+        onError: () -> Unit
+    ) {
         viewModelScope.launch {
             try {
-                val sellerId = (uiState.value as? ListingDetailUiState.Success)?.listing?.seller_id ?: return@launch
-                repository.sendMessage(sellerId, content)
+                val cleanContent = content.trim()
+
+                if (cleanContent.isBlank()) {
+                    onError()
+                    return@launch
+                }
+
+                val sellerId = (uiState.value as? ListingDetailUiState.Success)
+                    ?.listing
+                    ?.seller_id
+                    ?: return@launch
+
+                repository.sendMessage(sellerId, cleanContent)
+
+                trackFirstMessageSent(cleanContent.length)
+
                 onSuccess()
             } catch (e: Exception) {
                 onError()
@@ -291,15 +341,21 @@ class ListingDetailViewModel(
         }
     }
 
-    // SPRINT 3: Funcion para marcar un producto como vendido
-    fun markAsSold(onComplete: () -> Unit, onError: (String) -> Unit = {}) {
+    fun markAsSold(
+        onComplete: () -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
             val currentState = _uiState.value as? ListingDetailUiState.Success
                 ?: return@launch onError("No se pudo actualizar la publicación")
 
+            if (!currentState.canMarkAsSold) {
+                onError("Esta publicación no se puede marcar como vendida")
+                return@launch
+            }
+
             try {
-                // SPRINT 3: Mandamos la orden al servidor y refrescamos el cache local
-                // Asumimos que el backend maneja el estado 'active'
+                trackTransactionCompleted()
                 loadListing(forceLoading = false)
                 onComplete()
             } catch (e: Exception) {
@@ -308,8 +364,10 @@ class ListingDetailViewModel(
         }
     }
 
-    // SPRINT 3: Borrado definitivo del producto
-    fun deleteListing(onComplete: () -> Unit, onError: (String) -> Unit = {}) {
+    fun deleteListing(
+        onComplete: () -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
             try {
                 val response = repository.deleteListing(listingId)
@@ -325,7 +383,6 @@ class ListingDetailViewModel(
         }
     }
 
-    // SPRINT 3: Envio del primer mensaje al vendedor (Bilateralismo)
     fun sendFirstMessage(
         recipientUserId: Int,
         content: String,
@@ -335,34 +392,35 @@ class ListingDetailViewModel(
         viewModelScope.launch {
             try {
                 val cleanContent = content.trim()
+
                 if (cleanContent.isBlank()) {
                     onError("El mensaje no puede estar vacío")
                     return@launch
                 }
 
-                // SPRINT 3: Usamos el metodo limpio del repositorio
                 repository.sendMessage(recipientUserId, cleanContent)
 
-                // Trackeamos para la BQ9
                 trackFirstMessageSent(cleanContent.length)
 
                 onComplete()
             } catch (e: Exception) {
-                // SPRINT 3: Usamos el traductor de errores para informar al usuario (Evita NIM)
                 val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
                 onError(userMessage)
             }
         }
     }
 
-    // SPRINT 3 - BQ11: Registro de transaccion completada para analiticas
     fun trackTransactionCompleted(
         rating: Int? = null,
         responseTimeMinutes: Int? = null
     ) {
+        if (transactionTracked) return
+
         val state = uiState.value as? ListingDetailUiState.Success ?: return
         val listing = state.listing
         val seller = state.seller
+
+        transactionTracked = true
 
         BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
             listingId = listing.id,
@@ -381,16 +439,17 @@ class ListingDetailViewModel(
     }
 }
 
-// Fabrica corregida para el Sprint 3
 class ListingDetailViewModelFactory(
     private val application: Application,
     private val listingId: Int
 ) : ViewModelProvider.Factory {
+
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ListingDetailViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return ListingDetailViewModel(application, listingId) as T
         }
+
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

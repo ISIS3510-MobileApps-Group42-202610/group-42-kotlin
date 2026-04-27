@@ -4,84 +4,95 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.unimarketfrontend.model.message.Message
+import com.example.unimarketfrontend.model.local.MessageEntity
 import com.example.unimarketfrontend.model.repository.MessagesRepository
 import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.model.utils.analytics.AnalyticsLogger
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/*
- * ViewModel del Chat - SPRINT 3 (Versión Final)
- * Implementa persistencia total con Room y reactividad mediante flujos.
- */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = MessagesRepository(application)
 
-    // ID de la persona con la que estamos chateando
     private val _otherId = MutableStateFlow<Int?>(null)
 
-    // Observamos si estamos offline para avisar al usuario (Evita NIM)
-    val isOffline = ConnectivityMonitor.isOnline
-        .map { !it }
+    val isOffline: StateFlow<Boolean> = ConnectivityMonitor.isOnline
+        .map { isOnline -> !isOnline }
         .stateIn(viewModelScope, SharingStarted.Lazily, false)
 
-    // Indica si el sistema esta procesando un envio
     private val _isSending = MutableStateFlow(false)
     val isSending: StateFlow<Boolean> = _isSending
 
-    //  Observamos los mensajes directamente desde Room
-    // flatMapLatest hace que si cambiamos de chat, se deje de observar el anterior
-    // y se empiece a observar el nuevo automaticamente.
-    val messages: StateFlow<List<com.example.unimarketfrontend.model.local.MessageEntity>> = _otherId
-        .filterNotNull()
-        .flatMapLatest { id -> repository.observeMessages(id) }
+    private val _sellerDetails = MutableStateFlow<String?>(null)
+    val sellerDetails: StateFlow<String?> = _sellerDetails
+
+    val messages: StateFlow<List<MessageEntity>> = _otherId
+        .flatMapLatest { id ->
+            if (id == null) {
+                emptyFlow()
+            } else {
+                repository.observeMessages(id)
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Carga el hilo y refresca desde la red
     fun loadThread(sellerId: Int) {
-        if (_otherId.value == sellerId) return // Evitamos recargas innecesarias
+        if (_otherId.value == sellerId) return
+
         _otherId.value = sellerId
+        _sellerDetails.value = "Usuario #$sellerId"
 
         viewModelScope.launch {
-            // Intentamos bajar mensajes frescos del servidor NestJS
-            repository.refreshThread(sellerId)
+            val refreshed = repository.refreshThread(sellerId)
+
+            if (!refreshed) {
+                Log.e("CHAT_VM", "No se pudo refrescar el hilo con id=$sellerId")
+            }
         }
     }
 
-    // Envio de mensaje con soporte de Conectividad Eventual
     fun sendMessage(sellerId: Int, content: String) {
-        if (content.isBlank()) return
+        val cleanContent = content.trim()
+
+        if (cleanContent.isBlank()) return
 
         viewModelScope.launch {
             _isSending.value = true
 
-            val isOnline = ConnectivityMonitor.isOnline.value
+            try {
+                val isOnline = ConnectivityMonitor.isOnline.value
 
-            if (isOnline) {
-                try {
-                    // Intento de envio real
-                    repository.sendMessage(sellerId, content)
+                if (isOnline) {
+                    try {
+                        repository.sendMessage(sellerId, cleanContent)
 
-                    // Analytics BQ4
-                    runCatching {
-                        AnalyticsLogger.log("message_sent", mapOf("seller_id" to sellerId.toString()))
+                        runCatching {
+                            AnalyticsLogger.log(
+                                "message_sent",
+                                mapOf("seller_id" to sellerId.toString())
+                            )
+                        }
+
+                        repository.refreshThread(sellerId)
+                    } catch (e: Exception) {
+                        Log.e("CHAT_VM", "Error enviando mensaje. Se guarda como pendiente: ${e.message}")
+                        repository.savePendingMessage(sellerId, cleanContent)
                     }
-
-                    // Refrescamos Room para que el nuevo mensaje aparezca
-                    repository.refreshThread(sellerId)
-
-                } catch (e: Exception) {
-                    // Fallo el servidor, guardamos en cola local (Evita UC loss)
-                    repository.savePendingMessage(sellerId, content)
+                } else {
+                    repository.savePendingMessage(sellerId, cleanContent)
                 }
-            } else {
-                // SPRINT 3: Sin red, directo a Room
-                repository.savePendingMessage(sellerId, content)
+            } finally {
+                _isSending.value = false
             }
-
-            _isSending.value = false
         }
     }
 }
