@@ -12,6 +12,7 @@ import com.example.unimarketfrontend.model.listing.MyListingsResponse
 import com.example.unimarketfrontend.model.listing.Review
 import com.example.unimarketfrontend.model.message.Message
 import com.example.unimarketfrontend.model.message.SendMessageRequest
+import com.example.unimarketfrontend.model.message.SendMessageAsSellerRequest
 import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 import com.example.unimarketfrontend.model.uploads.CloudinarySignatureResponse
 import com.example.unimarketfrontend.model.user.LoginRequest
@@ -102,7 +103,7 @@ interface ApiService {
     suspend fun sendMessageAsBuyer(@Body request: SendMessageRequest): Message
 
     @POST("api/v1/messages/seller")
-    suspend fun sendMessageAsSeller(@Body request: Map<String, Any>): Message
+    suspend fun sendMessageAsSeller(@Body request: SendMessageAsSellerRequest): Message
 
     @PATCH("api/v1/messages/{id}/read")
     suspend fun markAsRead(@Path("id") messageId: Int)
