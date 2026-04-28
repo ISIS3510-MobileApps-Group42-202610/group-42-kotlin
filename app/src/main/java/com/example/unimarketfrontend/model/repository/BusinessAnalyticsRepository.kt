@@ -170,11 +170,29 @@ class BusinessAnalyticsTracker(
     fun trackCampusBannerShown(
         listingId: Int,
         sellerId: Int?,
-        metadata: Map<String, Any?>? = null
+        metadata: Map<String, Any?>? = null,
+        buildingName: String = "",
+        latitude: Double = 0.0,
+        longitude: Double = 0.0
     ) {
-        trackEvent(BusinessEventName.CAMPUS_BANNER_SHOWN, listingId, sellerId, metadata)
+        scope.launch {
+            try {
+                val buyerId = resolveCurrentUserId()
+                val request = com.example.unimarketfrontend.model.analytics.CampusLocationEventRequest(
+                    event_name = "campus_banner_shown",
+                    user_id = buyerId ?: 0,
+                    listing_id = listingId,
+                    seller_id = sellerId ?: 0,
+                    building_name = buildingName,
+                    latitude = latitude,
+                    longitude = longitude,
+                    timestamp = nowIsoUtc(),
+                    metadata = metadata?.mapValues { it.value?.toString() ?: "" } ?: emptyMap()
+                )
+                AnalyticsRetrofitInstance.api.sendCampusEvent(request)
+            } catch (e: Exception) { }
+        }
     }
-
     private fun nowIsoUtc(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")

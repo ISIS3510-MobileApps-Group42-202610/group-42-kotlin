@@ -5,21 +5,16 @@ import com.example.unimarketfrontend.model.local.ConversationEntity
 import com.example.unimarketfrontend.model.local.MessageEntity
 import com.example.unimarketfrontend.model.local.PendingMessageEntity
 import kotlinx.coroutines.flow.Flow
-import com.example.unimarketfrontend.model.message.Message
-import com.example.unimarketfrontend.model.repository.MessagesRepository
 
-/*
- * Data Access Object (DAO) para el modulo de mensajeria.
- * Define como interactuamos con la base de datos Room.
- * Usamos Flows para que la UI se actualice sola cuando cambien los datos (Patron Observer).
- */
 @Dao
 interface MessagesDao {
-    
-    // Observamos los chats: si Room cambia, la pantalla se entera sola.
-    // Ordenamos por cachedAt para que los chats mas recientes salgan primero.
+
     @Query("SELECT * FROM conversations ORDER BY cachedAt DESC")
     fun observeConversations(): Flow<List<ConversationEntity>>
+
+    // NUEVO: Necesario para saber si soy comprador o vendedor al cargar el thread
+    @Query("SELECT * FROM conversations WHERE otherPersonId = :otherId LIMIT 1")
+    suspend fun getConversationById(otherId: Int): ConversationEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConversations(list: List<ConversationEntity>)
@@ -30,8 +25,6 @@ interface MessagesDao {
     @Query("SELECT MIN(cachedAt) FROM conversations")
     suspend fun getOldestCachedAt(): Long?
 
-    // --- Cola de mensajes pendientes (Eventual Connectivity) ---
-    
     @Insert
     suspend fun insertPending(msg: PendingMessageEntity)
 

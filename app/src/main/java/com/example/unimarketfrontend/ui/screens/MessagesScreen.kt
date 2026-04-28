@@ -13,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,7 +70,6 @@ fun MessagesScreen(
                 .padding(innerPadding)
         ) {
             // --- SPRINT 3: GESTION DE CONECTIVIDAD ---
-            // Si el monitor detecta que no hay internet, avisamos al usuario (Evita NIM)
             if (isOffline) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -86,14 +84,12 @@ fun MessagesScreen(
                 }
             }
 
-            // Indicador de que estamos buscando datos nuevos en background (Cache-then-Network)
             if (isRefreshing) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
                 if (conversations.isEmpty() && !isRefreshing) {
-                    // Estado vacio: el usuario no tiene chats guardados ni red para bajar nuevos
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -117,11 +113,9 @@ fun MessagesScreen(
                         )
                     }
                 } else {
-                    // Lista de conversaciones reactiva (conecta con Room)
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(conversations) { entity ->
                             ConversationRow(
-                                // Mapeamos la entidad de Room al modelo de vista
                                 conversation = ConversationPreview(
                                     otherPersonId = entity.otherPersonId,
                                     otherPersonName = entity.otherPersonName,
@@ -131,10 +125,14 @@ fun MessagesScreen(
                                 ),
                                 onClick = {
                                     navController.navigate(
-                                        ChatRoutesFactory.chatPath(entity.otherPersonId, entity.otherPersonName)
-                                     )
-                                 }
-                             )
+                                        ChatRoutesFactory.chatPath(
+                                            otherId = entity.otherPersonId,
+                                            otherName = entity.otherPersonName,
+                                            iAmBuyer = entity.iAmBuyer
+                                        )
+                                    )
+                                }
+                            )
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 76.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant
@@ -147,10 +145,6 @@ fun MessagesScreen(
     }
 }
 
-/*
- * Fila individual para cada conversacion en la lista.
- * Resalta visualmente si hay mensajes pendientes de lectura.
- */
 @Composable
 fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {}) {
     Row(
@@ -160,7 +154,6 @@ fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {})
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Icono de perfil generico
         Box(
             modifier = Modifier
                 .size(50.dp)
@@ -180,7 +173,6 @@ fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {})
 
         Spacer(Modifier.width(12.dp))
 
-        // Info de la conversacion (Nombre, Mensaje, Hora)
         Column(modifier = Modifier.weight(1f)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -211,8 +203,7 @@ fun ConversationRow(conversation: ConversationPreview, onClick: () -> Unit = {})
                     MaterialTheme.colorScheme.outline
             )
         }
-        
-        // Punto azul de notificacion para mensajes no leidos
+
         if (!conversation.isRead) {
             Spacer(Modifier.width(8.dp))
             Box(

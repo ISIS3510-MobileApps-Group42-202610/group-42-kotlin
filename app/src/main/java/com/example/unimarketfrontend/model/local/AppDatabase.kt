@@ -19,7 +19,7 @@ import com.example.unimarketfrontend.model.local.dao.MessagesDao
         PendingMessageEntity::class,
         MessageEntity::class // SPRINT 3: Tabla para el historial bilateral de mensajes
     ],
-    version = 5, // Subimos a la version 5 por la nueva tabla MessageEntity
+    version = 6, // Subimos a la version 5 por la nueva tabla MessageEntity
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

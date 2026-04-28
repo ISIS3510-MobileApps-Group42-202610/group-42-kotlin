@@ -10,103 +10,153 @@ import com.example.unimarketfrontend.model.message.SendMessageRequest
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import kotlinx.coroutines.flow.Flow
 
-/*
- * Repositorio de Mensajeria - SPRINT 3
- * Centraliza la persistencia local con Room y la sincronizacion bilateral con el Backend.
- * Maneja la identidad dinamica para asegurar que las burbujas de chat salgan del lado correcto.
- */
 class MessagesRepository(context: Context) {
     private val db = AppDatabase.getInstance(context)
     private val messagesDao = db.messagesDao()
     private val api = RetrofitInstance.api
 
-    fun observeConversations(): Flow<List<ConversationEntity>> = messagesDao.observeConversations()
+    fun observeConversations(): Flow<List<ConversationEntity>> =
+        messagesDao.observeConversations()
 
-    // Táctica de Temporal Cache: 5 minutos
-    suspend fun isCacheStale(maxAgeMs: Long = 5 * 60 * 1000L): Boolean {
+    fun observeMessages(otherId: Int): Flow<List<MessageEntity>> =
+        messagesDao.observeMessages(otherId)
+
+    suspend fun isCacheStale(): Boolean {
         val oldest = messagesDao.getOldestCachedAt() ?: return true
-        return (System.currentTimeMillis() - oldest) > maxAgeMs
+        return (System.currentTimeMillis() - oldest) > (5 * 60 * 1000L)
     }
 
-    // ACTUALIZACION BILATERAL: Traemos mensajes como comprador Y vendedor
     suspend fun refreshFromNetwork(): Boolean {
         return try {
-            val myId = api.getMe().id
             val asBuyer = api.getMessagesAsBuyer()
             val asSeller = api.getMessagesAsSeller()
 
-            val allMessages = (asBuyer + asSeller).distinctBy { it.id }
+            // Conversaciones donde soy COMPRADOR
+            val buyerConversations = asBuyer
+                .groupBy { it.seller_id ?: 0 }
+                .filter { (id, _) -> id != 0 }
+                .mapNotNull { (sellerId, msgs) ->
+                    val last = msgs.maxByOrNull { it.created_at ?: "" } ?: return@mapNotNull null
+                    val sellerUser = last.seller?.user
+                    ConversationEntity(
+                        otherPersonId = sellerId,
+                        otherPersonName = buildName(sellerUser?.name, sellerUser?.last_name)
+                            .ifBlank { "Seller #$sellerId" },
+                        lastMessage = last.content,
+                        lastMessageTime = formatTime(last.created_at),
+                        isRead = last.is_read,
+                        cachedAt = System.currentTimeMillis(),
+                        iAmBuyer = true
+                    )
+                }
 
-            // Mapeo Bilateral: El nombre es siempre el de la OTRA persona
-            val entities = allMessages.groupBy {
-                if (it.buyer_id == myId) it.seller_id else it.buyer_id
-            }.mapNotNull { (otherId, msgs) ->
-                if (otherId == null || otherId == 0) return@mapNotNull null
-                val last = msgs.maxByOrNull { it.created_at ?: "" } ?: return@mapNotNull null
-                val otherUser = if (last.buyer_id == myId) last.seller?.user else last.buyer?.user
+            // Conversaciones donde soy VENDEDOR
+            val sellerConversations = asSeller
+                .groupBy { it.buyer_id ?: 0 }
+                .filter { (id, _) -> id != 0 }
+                .mapNotNull { (buyerId, msgs) ->
+                    // Evitar duplicar si ya existe como conversación de comprador
+                    if (buyerConversations.any { it.otherPersonId == buyerId }) return@mapNotNull null
+                    val last = msgs.maxByOrNull { it.created_at ?: "" } ?: return@mapNotNull null
+                    val buyerUser = last.buyer?.user
+                    ConversationEntity(
+                        otherPersonId = buyerId,
+                        otherPersonName = buildName(buyerUser?.name, buyerUser?.last_name)
+                            .ifBlank { "Buyer #$buyerId" },
+                        lastMessage = last.content,
+                        lastMessageTime = formatTime(last.created_at),
+                        isRead = last.is_read,
+                        cachedAt = System.currentTimeMillis(),
+                        iAmBuyer = false
+                    )
+                }
 
-                ConversationEntity(
-                    otherPersonId = otherId,
-                    otherPersonName = "${otherUser?.name ?: "Usuario"} ${otherUser?.last_name ?: ""}".trim(),
-                    lastMessage = last.content,
-                    lastMessageTime = last.created_at?.takeIf { it.length >= 16 }?.substring(11, 16) ?: "",
-                    isRead = last.is_read,
-                    cachedAt = System.currentTimeMillis()
-                )
-            }
-
+            val all = buyerConversations + sellerConversations
             messagesDao.clearConversations()
-            messagesDao.insertConversations(entities)
+            messagesDao.insertConversations(all)
             true
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 
-    // HISTORIAL BILATERAL: Calcula isMine comparando con mi ID real
-    suspend fun refreshThread(otherId: Int): Boolean {
+    // iAmBuyer viene directo del parámetro — sin consultar Room
+    suspend fun refreshThread(otherId: Int, iAmBuyer: Boolean): Boolean {
         return try {
-            val myId = api.getMe().id
-            val messages = api.getThread(otherId)
+            val messages: List<Message> = if (iAmBuyer) {
+                // otherId es seller entity ID
+                api.getThread(otherId)
+            } else {
+                // otherId es buyer user ID
+                api.getThreadAsSeller(otherId)
+            }
+
             val entities = messages.map { msg ->
+                // CORRECCIÓN: isMine depende solo de sent_by y el rol del usuario actual
+                // Si soy comprador → mis mensajes tienen sent_by = "buyer"
+                // Si soy vendedor → mis mensajes tienen sent_by = "seller"
+                // No necesitamos comparar user IDs — la conversación es entre exactamente dos personas
+                val isMine = if (iAmBuyer) {
+                    msg.sent_by == "buyer"
+                } else {
+                    msg.sent_by == "seller"
+                }
+
                 MessageEntity(
                     id = msg.id,
                     content = msg.content,
                     sentBy = msg.sent_by,
                     conversationWithId = otherId,
                     createdAt = msg.created_at,
-                    isMine = (msg.sent_by == "buyer" && msg.buyer_id == myId) ||
-                            (msg.sent_by == "seller" && msg.seller_id == myId)
+                    isMine = isMine
                 )
             }
+
             messagesDao.clearMessagesWith(otherId)
             messagesDao.insertMessages(entities)
             true
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 
-    fun observeMessages(otherId: Int) = messagesDao.observeMessages(otherId)
-
-    suspend fun sendMessage(sellerId: Int, content: String): Message {
-        return api.sendMessageAsBuyer(SendMessageRequest(seller_id = sellerId, content = content))
+    // iAmBuyer viene directo del parámetro
+    suspend fun sendMessage(otherId: Int, content: String, iAmBuyer: Boolean): Message {
+        return if (iAmBuyer) {
+            api.sendMessageAsBuyer(SendMessageRequest(seller_id = otherId, content = content))
+        } else {
+            // otherId es buyer user ID cuando sos vendedor
+            api.sendMessageAsSeller(mapOf("buyer_id" to otherId, "content" to content))
+        }
     }
 
-    // Conectividad Eventual: Guarda en Room si falla la red
-    suspend fun savePendingMessage(sellerId: Int, content: String) {
+    suspend fun savePendingMessage(otherId: Int, content: String) {
         messagesDao.insertPending(
-            PendingMessageEntity(sellerId = sellerId, content = content)
+            PendingMessageEntity(sellerId = otherId, content = content)
         )
     }
 
-    // Reintento automatico
     suspend fun retryPendingMessages(): Int {
-        val pendingMessages = messagesDao.getPending()
-        var sentCount = 0
-        pendingMessages.forEach { pending ->
+        val pending = messagesDao.getPending()
+        var count = 0
+        for (msg in pending) {
             try {
-                api.sendMessageAsBuyer(SendMessageRequest(seller_id = pending.sellerId, content = pending.content))
-                messagesDao.deletePending(pending.localId)
-                sentCount++
-            } catch (_: Exception) { }
+                // Los pendientes siempre son de comprador (se envían cuando se reintenta)
+                api.sendMessageAsBuyer(
+                    SendMessageRequest(seller_id = msg.sellerId, content = msg.content)
+                )
+                messagesDao.deletePending(msg.localId)
+                count++
+            } catch (e: Exception) { }
         }
-        return sentCount
+        return count
+    }
+
+    private fun buildName(first: String?, last: String?): String =
+        listOfNotNull(first, last).joinToString(" ").trim()
+
+    private fun formatTime(isoDate: String?): String {
+        if (isoDate == null) return ""
+        return try { isoDate.substring(11, 16) } catch (e: Exception) { "" }
     }
 }

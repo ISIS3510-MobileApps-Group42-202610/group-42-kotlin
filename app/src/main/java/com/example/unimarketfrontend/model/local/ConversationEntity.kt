@@ -3,11 +3,6 @@ package com.example.unimarketfrontend.model.local
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-/*
- * Esta clase es el molde para guardar los chats en la memoria del celular.
- * Usamos el ID del vendedor como llave primaria para que no se dupliquen.
- * Sirve para implementar el Temporal Cache (Ch. 10 del libro).
- */
 @Entity(tableName = "conversations")
 data class ConversationEntity(
     @PrimaryKey val otherPersonId: Int,
@@ -15,5 +10,8 @@ data class ConversationEntity(
     val lastMessage: String,
     val lastMessageTime: String,
     val isRead: Boolean,
-    val cachedAt: Long = System.currentTimeMillis() // Para saber que tan viejos son los datos y aplicar política de expiración
+    val cachedAt: Long = System.currentTimeMillis(),
+    // SPRINT 3 FIX: Guardamos si el usuario logueado es el comprador en esta conversación.
+    // Necesario para saber qué endpoint de thread usar al abrir el chat.
+    val iAmBuyer: Boolean = true
 )

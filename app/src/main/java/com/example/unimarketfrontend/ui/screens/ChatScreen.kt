@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.utils.LocationHelper
 import com.example.unimarketfrontend.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
@@ -31,56 +32,38 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatScreen(
     navController: NavController,
-    sellerId: Int,
-    sellerName: String,
+    otherId: Int,
+    otherName: String,
+    iAmBuyer: Boolean,          // NUEVO: recibimos el rol directamente
     viewModel: ChatViewModel = viewModel()
 ) {
-    // Suscripción al flujo de mensajes de Room (MessageEntity)
     val messages by viewModel.messages.collectAsState()
     val isSending by viewModel.isSending.collectAsState()
     val isOffline by viewModel.isOffline.collectAsState()
-
     var inputText by remember { mutableStateOf("") }
-    var isOnCampus by remember { mutableStateOf(false) }
-
+    var nearbyBuilding by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
 
-    // Gestión del sensor GPS
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            coroutineScope.launch {
-                val building = LocationHelper.getNearbyBuilding(context)
-                isOnCampus = building != null
-            }
-        }
-    }
+    LaunchedEffect(otherId) {
+        // Pasamos iAmBuyer para que el ViewModel sepa qué endpoint usar desde el inicio
+        viewModel.loadThread(otherId, iAmBuyer)
 
-    // Efecto de carga inicial y detección de contexto (Smart Feature BQ10)
-    LaunchedEffect(sellerId) {
-        viewModel.loadThread(sellerId)
-        if (LocationHelper.hasPermission(context)) {
-            val building = LocationHelper.getNearbyBuilding(context)
-            isOnCampus = building != null
-            if (isOnCampus) {
-                // Registramos el evento para el dashboard de analíticas
-                com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
-                    listingId = -1,
-                    sellerId = sellerId,
-                    metadata = mapOf("building" to building!!)
-                )
-            }
-        } else {
-            permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        val building = LocationHelper.getNearbyBuilding(context)
+        nearbyBuilding = building
+        if (building != null) {
+            BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
+                listingId = -1,
+                sellerId = otherId,
+                buildingName = building,
+                metadata = mapOf("building" to building)
+            )
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(sellerName) },
+                title = { Text(otherName) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -89,59 +72,56 @@ fun ChatScreen(
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // SPRINT 3: Banner informativo de conexión (Evita NIM)
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+
             if (isOffline) {
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.errorContainer
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Modo Offline - Viendo mensajes guardados",
+                        text = "Offline - Showing saved messages",
+                        modifier = Modifier.padding(8.dp),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(8.dp)
+                        color = MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
             }
 
-            // SMART FEATURE: Sugerencia de punto de encuentro según edificio detectado
-            if (isOnCampus) {
+            if (nearbyBuilding != null) {
                 Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = MaterialTheme.shapes.medium
+                        .padding(8.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text("You are on campus", style = MaterialTheme.typography.labelSmall)
-                        Text("Suggested meeting point: Mario Laserna lobby", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "You are near $nearbyBuilding",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = "Suggested meeting point: Mario Laserna building lobby",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
                 }
             }
 
-            // Lista de mensajes reactiva a Room
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 16.dp),
                 reverseLayout = true
             ) {
-                // Usamos message.isMine que ya viene calculado del repositorio bilateral
                 items(messages.reversed()) { message ->
-                    ChatBubble(
-                        content = message.content,
-                        isMine = message.isMine
-                    )
+                    ChatBubble(content = message.content, isMine = message.isMine)
                 }
             }
 
-            // Input con soporte para Conectividad Eventual
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -159,16 +139,17 @@ fun ChatScreen(
                 IconButton(
                     onClick = {
                         if (inputText.isNotBlank()) {
-                            viewModel.sendMessage(sellerId, inputText)
+                            // Pasamos iAmBuyer para que el ViewModel use el endpoint correcto
+                            viewModel.sendMessage(otherId, inputText, iAmBuyer)
                             inputText = ""
                         }
                     },
                     enabled = !isSending
                 ) {
                     if (isSending) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                     } else {
-                        Icon(Icons.AutoMirrored.Filled.Send, null)
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
                     }
                 }
             }
@@ -186,13 +167,15 @@ private fun ChatBubble(content: String, isMine: Boolean) {
     ) {
         Surface(
             shape = MaterialTheme.shapes.medium,
-            color = if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+            color = if (isMine) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
             Text(
                 text = content,
-                modifier = Modifier.padding(12.dp),
-                color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                color = if (isMine) MaterialTheme.colorScheme.onPrimary
+                else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
