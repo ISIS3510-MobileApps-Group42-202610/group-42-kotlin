@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.play.services.location)
+    implementation(libs.androidx.compose.ui.text)
     debugImplementation(libs.androidx.ui.tooling)
     implementation(libs.retrofit)
     implementation(libs.converter.gson)

@@ -54,27 +54,42 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (content.isBlank()) return
         currentIAmBuyer = iAmBuyer
 
+        android.util.Log.d("ChatViewModel", "sendMessage called - otherId=$otherId, iAmBuyer=$iAmBuyer, content='$content'")
+
         viewModelScope.launch {
             _isSending.value = true
 
-            if (ConnectivityMonitor.isOnline.value) {
-                try {
-                    repository.sendMessage(otherId, content, iAmBuyer)
+            try {
+                if (ConnectivityMonitor.isOnline.value) {
+                    android.util.Log.d("ChatViewModel", "Online - sending message to server")
+
+                    // Enviar mensaje al servidor
+                    val sentMessage = repository.sendMessage(otherId, content, iAmBuyer)
+                    android.util.Log.d("ChatViewModel", "Message sent successfully: ${sentMessage.id}")
+
                     // Refresh inmediato para que el mensaje aparezca en la UI
-                    repository.refreshThread(otherId, iAmBuyer)
+                    val refreshSuccess = repository.refreshThread(otherId, iAmBuyer)
+                    android.util.Log.d("ChatViewModel", "Thread refresh result: $refreshSuccess")
+
                     AnalyticsLogger.log(
                         "message_sent",
-                        mapOf("seller_id" to otherId.toString())
+                        mapOf(
+                            "other_id" to otherId.toString(),
+                            "role" to if (iAmBuyer) "buyer" else "seller"
+                        )
                     )
-                } catch (e: Exception) {
-                    // Si falla, guarda como pendiente
+                } else {
+                    // Sin conexión: guardar como pendiente
                     repository.savePendingMessage(otherId, content)
+                    android.util.Log.d("ChatViewModel", "Message saved as pending (offline)")
                 }
-            } else {
+            } catch (e: Exception) {
+                // Si falla el envío, guardar como pendiente
+                android.util.Log.e("ChatViewModel", "Error sending message: ${e.message}", e)
                 repository.savePendingMessage(otherId, content)
+            } finally {
+                _isSending.value = false
             }
-
-            _isSending.value = false
         }
     }
 }

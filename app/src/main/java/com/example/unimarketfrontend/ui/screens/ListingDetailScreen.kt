@@ -391,10 +391,21 @@ fun ListingDetailScreen(
                     if (contactTargetId != null) {
                         Button(
                             onClick = {
-                                showMessageDialog = true
-                                messageError = null
-                                vm.trackChatStarted()
+                                // Determinar si soy comprador o vendedor
+                                val iAmBuyer = !current.isOwner
 
+                                android.util.Log.d("ListingDetailScreen", "Contact button clicked - targetId=$contactTargetId, iAmBuyer=$iAmBuyer")
+
+                                // Navegar directamente al chat con el rol correcto
+                                navController.navigate(
+                                    ChatRoutesFactory.chatPath(
+                                        otherId = contactTargetId,
+                                        otherName = contactTargetName ?: "Usuario",
+                                        iAmBuyer = iAmBuyer
+                                    )
+                                )
+
+                                vm.trackChatStarted()
                             },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = contactTargetId != null

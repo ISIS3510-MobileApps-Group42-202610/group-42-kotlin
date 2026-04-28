@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -44,19 +45,49 @@ fun ChatScreen(
     var nearbyBuilding by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
+    // Solicitar permisos de ubicación
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Recargar para intentar obtener ubicación
+            kotlinx.coroutines.GlobalScope.launch {
+                val building = LocationHelper.getNearbyBuilding(context)
+                nearbyBuilding = building
+                if (building != null) {
+                    BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
+                        listingId = -1,
+                        sellerId = otherId,
+                        buildingName = building,
+                        metadata = mapOf("building" to building)
+                    )
+                }
+            }
+        }
+    }
+
     LaunchedEffect(otherId) {
+        android.util.Log.d("ChatScreen", "Loading thread - otherId=$otherId, iAmBuyer=$iAmBuyer")
+
         // Pasamos iAmBuyer para que el ViewModel sepa qué endpoint usar desde el inicio
         viewModel.loadThread(otherId, iAmBuyer)
 
-        val building = LocationHelper.getNearbyBuilding(context)
-        nearbyBuilding = building
-        if (building != null) {
-            BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
-                listingId = -1,
-                sellerId = otherId,
-                buildingName = building,
-                metadata = mapOf("building" to building)
-            )
+        // Verificar permisos y obtener ubicación
+        if (LocationHelper.hasPermission(context)) {
+            val building = LocationHelper.getNearbyBuilding(context)
+            android.util.Log.d("ChatScreen", "Nearby building: $building")
+            nearbyBuilding = building
+            if (building != null) {
+                BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
+                    listingId = -1,
+                    sellerId = otherId,
+                    buildingName = building,
+                    metadata = mapOf("building" to building)
+                )
+            }
+        } else {
+            android.util.Log.d("ChatScreen", "Location permission not granted, requesting...")
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -98,12 +129,14 @@ fun ChatScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "You are near $nearbyBuilding",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = "📍 You are near $nearbyBuilding",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Suggested meeting point: Mario Laserna building lobby",
+                            text = "Suggested meeting point: $nearbyBuilding lobby",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )

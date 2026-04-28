@@ -54,12 +54,20 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             ConnectivityMonitor.isOnline.collectLatest { online ->
                 _isOffline.value = !online
+                android.util.Log.d("MessagesViewModel", "Connectivity changed: online=$online")
 
                 if (online) {
-                    //  SPRINT 3: Si volvio el internet, vaciamos la cola de mensajes
+                    //  SPRINT 3: Si volvió el internet, vaciamos la cola de mensajes
                     launch {
-                        repository.retryPendingMessages() // CORREGIDO: Faltaban los ()
-                        repository.refreshFromNetwork()   // Refrescamos para ver chats nuevos bilaterales
+                        try {
+                            val retriedCount = repository.retryPendingMessages()
+                            android.util.Log.d("MessagesViewModel", "Retried $retriedCount pending messages")
+
+                            // Refrescamos para ver chats nuevos bilaterales
+                            repository.refreshFromNetwork()
+                        } catch (e: Exception) {
+                            android.util.Log.e("MessagesViewModel", "Error retrying pending messages: ${e.message}", e)
+                        }
                     }
                 }
             }
