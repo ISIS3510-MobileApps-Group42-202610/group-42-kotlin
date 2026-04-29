@@ -51,24 +51,31 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _isSending.value = true
+            val isOnline = ConnectivityMonitor.isOnline.value
+            android.util.Log.d("ChatViewModel", "sendMessage: otherId=$otherId, iAmBuyer=$iAmBuyer, isOnline=$isOnline")
+
+            if (!isOnline) {
+                // Offline: guardar como pendiente y mostrar en UI
+                android.util.Log.d("ChatViewModel", "OFFLINE - saving as pending")
+                repository.savePendingMessage(otherId, content)
+                _isSending.value = false
+                return@launch
+            }
 
             try {
-                if (ConnectivityMonitor.isOnline.value) {
-                    repository.sendMessage(otherId, content, iAmBuyer)
-                    repository.refreshThread(otherId, iAmBuyer)
+                repository.sendMessage(otherId, content, iAmBuyer)
+                repository.refreshThread(otherId, iAmBuyer)
 
-                    AnalyticsLogger.log(
-                        "message_sent",
-                        mapOf(
-                            "other_id" to otherId.toString(),
-                            "role" to if (iAmBuyer) "buyer" else "seller"
-                        )
+                AnalyticsLogger.log(
+                    "message_sent",
+                    mapOf(
+                        "other_id" to otherId.toString(),
+                        "role" to if (iAmBuyer) "buyer" else "seller"
                     )
-                } else {
-                    repository.savePendingMessage(otherId, content)
-                }
+                )
             } catch (e: Exception) {
-                android.util.Log.e("ChatViewModel", "Error sending message: ${e.message}", e)
+                // Network error: guardar como pendiente
+                android.util.Log.e("ChatViewModel", "Send failed, saving as pending: ${e.message}")
                 repository.savePendingMessage(otherId, content)
             } finally {
                 _isSending.value = false

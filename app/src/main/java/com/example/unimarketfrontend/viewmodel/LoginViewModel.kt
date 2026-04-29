@@ -30,7 +30,13 @@ class LoginViewModel : ViewModel() {
                 onSuccess()
 
             } catch (e: Exception) {
-                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
+                val userMessage = if (e is java.net.UnknownHostException ||
+                    e is java.net.ConnectException ||
+                    e is java.net.SocketTimeoutException) {
+                    "No internet connection. Please check your network and try again."
+                } else {
+                    ErrorTranslator.getUserFriendlyMessage(e)
+                }
                 onError(userMessage)
             }
         }

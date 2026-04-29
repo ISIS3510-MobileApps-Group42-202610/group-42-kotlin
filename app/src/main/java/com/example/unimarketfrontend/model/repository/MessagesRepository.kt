@@ -38,13 +38,16 @@ class MessagesRepository(context: Context) {
                 .mapNotNull { (sellerId, msgs) ->
                     val last = msgs.maxByOrNull { it.created_at ?: "" } ?: return@mapNotNull null
                     val sellerUser = last.seller?.user
+                    // Solo marcar como no leido si el ultimo mensaje es del vendedor (no mio)
+                    val lastIsFromOther = last.sent_by.equals("seller", ignoreCase = true)
+                    val unread = lastIsFromOther && !last.is_read
                     ConversationEntity(
                         otherPersonId = sellerId,
                         otherPersonName = buildName(sellerUser?.name, sellerUser?.last_name)
                             .ifBlank { "Seller #$sellerId" },
                         lastMessage = last.content,
                         lastMessageTime = formatTime(last.created_at),
-                        isRead = last.is_read,
+                        isRead = !unread,
                         cachedAt = System.currentTimeMillis(),
                         iAmBuyer = true
                     )
@@ -58,9 +61,11 @@ class MessagesRepository(context: Context) {
                     val last = msgs.maxByOrNull { it.created_at ?: "" } ?: return@mapNotNull null
                     val buyerUser = last.buyer?.user
 
-                    // CLAVE: Para enviar mensajes como vendedor necesitamos el USER ID del comprador,
-                    // no el buyer entity ID. buyer.user.id es el user ID real.
                     val buyerUserId = buyerUser?.id ?: buyerId
+
+                    // Solo marcar como no leido si el ultimo mensaje es del comprador (no mio)
+                    val lastIsFromOther = last.sent_by.equals("buyer", ignoreCase = true)
+                    val unread = lastIsFromOther && !last.is_read
 
                     ConversationEntity(
                         otherPersonId = buyerUserId,
@@ -68,7 +73,7 @@ class MessagesRepository(context: Context) {
                             .ifBlank { "Buyer #$buyerId" },
                         lastMessage = last.content,
                         lastMessageTime = formatTime(last.created_at),
-                        isRead = last.is_read,
+                        isRead = !unread,
                         cachedAt = System.currentTimeMillis(),
                         iAmBuyer = false
                     )
@@ -92,9 +97,6 @@ class MessagesRepository(context: Context) {
             }
 
             val entities = messages.map { msg ->
-                // Lógica simple: sent_by indica quién mandó el mensaje.
-                // Si soy buyer, mis mensajes son sent_by="buyer".
-                // Si soy seller, mis mensajes son sent_by="seller".
                 val isMine = if (iAmBuyer) {
                     msg.sent_by.equals("buyer", ignoreCase = true)
                 } else {
@@ -111,8 +113,17 @@ class MessagesRepository(context: Context) {
                 )
             }
 
-            messagesDao.clearMessagesWith(otherId)
+            // Borrar solo mensajes del servidor (ID positivo), mantener pendientes (ID negativo)
+            messagesDao.clearServerMessagesWith(otherId)
             messagesDao.insertMessages(entities)
+
+            // Si hay pendientes que ya fueron enviados (aparecen en el servidor), limpiarlos
+            val pendingCount = messagesDao.countPendingMessagesWith(otherId)
+            if (pendingCount > 0 && entities.isNotEmpty()) {
+                // Los pendientes ya se enviaron y aparecen en el servidor, borrar los locales
+                messagesDao.clearPendingMessagesWith(otherId)
+            }
+
             true
         } catch (e: Exception) {
             android.util.Log.e("MessagesRepository", "Error refreshing thread: ${e.message}", e)
@@ -129,9 +140,31 @@ class MessagesRepository(context: Context) {
     }
 
     suspend fun savePendingMessage(otherId: Int, content: String) {
+        android.util.Log.d("MessagesRepository", "savePendingMessage: otherId=$otherId, content='$content'")
+
+        // 1. Guardar en la cola de pendientes para reenviar cuando vuelva internet
         messagesDao.insertPending(
             PendingMessageEntity(sellerId = otherId, content = content)
         )
+
+        // 2. Insertar también en la tabla de mensajes para que aparezca en la UI inmediatamente
+        // Usamos un ID negativo temporal basado en timestamp para evitar colisiones
+        val tempId = -(System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+        val now = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }.format(java.util.Date())
+
+        messagesDao.insertMessages(listOf(
+            MessageEntity(
+                id = tempId,
+                content = content,
+                sentBy = "pending",
+                conversationWithId = otherId,
+                createdAt = now,
+                isMine = true
+            )
+        ))
+        android.util.Log.d("MessagesRepository", "Pending message saved with tempId=$tempId")
     }
 
     suspend fun retryPendingMessages(): Int {
@@ -144,6 +177,7 @@ class MessagesRepository(context: Context) {
                 )
                 messagesDao.deletePending(msg.localId)
                 count++
+
             } catch (e: Exception) { }
         }
         return count
