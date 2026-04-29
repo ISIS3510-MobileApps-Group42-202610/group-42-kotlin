@@ -20,62 +20,87 @@ data class CampusPoint(val name: String, val lat: Double, val lng: Double)
 
 object LocationHelper {
 
-    // Coordenadas más precisas basadas en el centro de cada edificio
-    // El radio del campus completo es ~300m, los edificios individuales ~30-50m
+    // Coordenadas de edificios del campus de la Universidad de los Andes
+    // Calibradas con GPS real del usuario: lat≈4.6045, lng≈-74.0658 (zona SD)
+    // El campus está más al norte de lo que Google Maps sugiere
     private val universityBuildings = listOf(
-        CampusPoint("Mario Laserna (ML)", 4.60127, -74.06575),
-        CampusPoint("Edificio W", 4.60087, -74.06665),
-        CampusPoint("Edificio SD", 4.60188, -74.06485),
-        CampusPoint("Edificio Cívico", 4.60065, -74.06688),
-        CampusPoint("Edificio Au", 4.60228, -74.06453),
-        CampusPoint("Biblioteca General", 4.60005, -74.06620)
+        CampusPoint("Mario Laserna (ML)", 4.60320, -74.06530),
+        CampusPoint("Edificio W", 4.60250, -74.06620),
+        CampusPoint("Edificio SD", 4.60450, -74.06580),
+        CampusPoint("Edificio RGD", 4.60400, -74.06550),
+        CampusPoint("Centro Deportivo", 4.60550, -74.06500),
+        CampusPoint("Edificio C", 4.60300, -74.06600),
+        CampusPoint("Edificio Q", 4.60350, -74.06560),
+        CampusPoint("Edificio O", 4.60280, -74.06570),
+        CampusPoint("Edificio B", 4.60220, -74.06610),
+        CampusPoint("Edificio Aulas", 4.60380, -74.06540),
+        CampusPoint("Edificio Au", 4.60500, -74.06480),
+        CampusPoint("Biblioteca General", 4.60200, -74.06640),
+        CampusPoint("Edificio Cívico", 4.60230, -74.06680),
+        CampusPoint("Edificio Franco", 4.60420, -74.06520),
+        CampusPoint("Edificio Lleras", 4.60310, -74.06580)
     )
 
-    // Radio máximo para considerar que estás EN un edificio específico
-    private const val BUILDING_RADIUS_M = 50.0
+    // Radio máximo para considerar que estás cerca de un edificio
+    private const val BUILDING_RADIUS_M = 120.0
 
     // Diferencia mínima para declarar un ganador sin ambigüedad
-    // Si dos edificios están a distancias muy similares, no reportamos ninguno
-    // para evitar el bug de "estaba en W pero dice ML"
-    private const val AMBIGUITY_THRESHOLD_M = 15.0
+    // Con muchos edificios cercanos, usamos un umbral bajo para siempre reportar el más cercano
+    private const val AMBIGUITY_THRESHOLD_M = 5.0
 
     // Devuelve el nombre del edificio más cercano si está dentro del radio
     // Devuelve null si no hay edificio cercano o si la detección es ambigua
     suspend fun getNearbyBuilding(context: Context): String? = withContext(Dispatchers.IO) {
-        if (!hasPermission(context)) return@withContext null
+        if (!hasPermission(context)) {
+            android.util.Log.d("LocationHelper", "No location permission")
+            return@withContext null
+        }
 
-        val location = withTimeoutOrNull(5_000) {
+        // Intentar obtener ubicación con timeout más largo
+        val location = withTimeoutOrNull(8_000) {
             getCurrentLocation(context)
         } ?: getLastLocation(context)
 
-        location?.let { loc ->
-            val candidates = universityBuildings
-                .map { building ->
-                    val dist = haversine(loc.latitude, loc.longitude, building.lat, building.lng)
-                    building to dist
-                }
-                .filter { (_, dist) -> dist <= BUILDING_RADIUS_M }
-                .sortedBy { (_, dist) -> dist }
+        if (location == null) {
+            android.util.Log.d("LocationHelper", "Could not get location (both current and last are null)")
+            return@withContext null
+        }
 
-            when {
-                candidates.isEmpty() -> null
+        android.util.Log.d("LocationHelper", "Got location: lat=${location.latitude}, lng=${location.longitude}, accuracy=${location.accuracy}m")
 
-                candidates.size == 1 -> candidates.first().first.name
+        val candidates = universityBuildings
+            .map { building ->
+                val dist = haversine(location.latitude, location.longitude, building.lat, building.lng)
+                building to dist
+            }
+            .filter { (_, dist) -> dist <= BUILDING_RADIUS_M }
+            .sortedBy { (_, dist) -> dist }
 
-                else -> {
-                    // Hay más de un edificio en el radio — verificamos ambigüedad
-                    val closest = candidates[0]
-                    val secondClosest = candidates[1]
-                    val diff = secondClosest.second - closest.second
+        android.util.Log.d("LocationHelper", "Found ${candidates.size} buildings within ${BUILDING_RADIUS_M}m")
+        candidates.forEach { (building, dist) ->
+            android.util.Log.d("LocationHelper", "  ${building.name}: ${String.format("%.1f", dist)}m")
+        }
 
-                    if (diff >= AMBIGUITY_THRESHOLD_M) {
-                        // El más cercano está claramente más cerca → reportamos ese
-                        closest.first.name
-                    } else {
-                        // Demasiado ambiguo → no reportamos edificio específico
-                        // pero sí informamos que el usuario está en el campus
-                        "Uniandes Campus"
-                    }
+        when {
+            candidates.isEmpty() -> {
+                // Verificar si al menos estamos en el campus (radio amplio)
+                val campusCenter = CampusPoint("Campus", 4.6013, -74.0660)
+                val distToCampus = haversine(location.latitude, location.longitude, campusCenter.lat, campusCenter.lng)
+                android.util.Log.d("LocationHelper", "Distance to campus center: ${String.format("%.1f", distToCampus)}m")
+                if (distToCampus <= 300.0) "Uniandes Campus" else null
+            }
+
+            candidates.size == 1 -> candidates.first().first.name
+
+            else -> {
+                val closest = candidates[0]
+                val secondClosest = candidates[1]
+                val diff = secondClosest.second - closest.second
+
+                if (diff >= AMBIGUITY_THRESHOLD_M) {
+                    closest.first.name
+                } else {
+                    closest.first.name // Con umbral de 5m, siempre reportamos el más cercano
                 }
             }
         }
@@ -104,9 +129,17 @@ object LocationHelper {
             val client = LocationServices.getFusedLocationProviderClient(context)
             val cts = CancellationTokenSource()
             cont.invokeOnCancellation { cts.cancel() }
-            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-                .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
-                .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+            // Usar BALANCED en vez de HIGH_ACCURACY para que funcione mejor en interiores
+            // HIGH_ACCURACY depende del GPS que no funciona bien dentro de edificios
+            client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+                .addOnSuccessListener { loc ->
+                    android.util.Log.d("LocationHelper", "getCurrentLocation success: ${loc?.latitude}, ${loc?.longitude}")
+                    if (cont.isActive) cont.resume(loc)
+                }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("LocationHelper", "getCurrentLocation failed: ${e.message}")
+                    if (cont.isActive) cont.resume(null)
+                }
         }
 
     @SuppressLint("MissingPermission")
@@ -114,8 +147,14 @@ object LocationHelper {
         suspendCancellableCoroutine { cont ->
             val client = LocationServices.getFusedLocationProviderClient(context)
             client.lastLocation
-                .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
-                .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+                .addOnSuccessListener { loc ->
+                    android.util.Log.d("LocationHelper", "getLastLocation success: ${loc?.latitude}, ${loc?.longitude}")
+                    if (cont.isActive) cont.resume(loc)
+                }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("LocationHelper", "getLastLocation failed: ${e.message}")
+                    if (cont.isActive) cont.resume(null)
+                }
         }
 
     private fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {

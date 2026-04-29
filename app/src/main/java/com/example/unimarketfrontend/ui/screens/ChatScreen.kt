@@ -25,17 +25,13 @@ import com.example.unimarketfrontend.model.utils.LocationHelper
 import com.example.unimarketfrontend.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
 
-/*
- * Pantalla de Chat Individual - SPRINT 3
- * Corregida para ser 100% reactiva con Room y soportar el modo Offline.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     navController: NavController,
     otherId: Int,
     otherName: String,
-    iAmBuyer: Boolean,          // NUEVO: recibimos el rol directamente
+    iAmBuyer: Boolean,
     viewModel: ChatViewModel = viewModel()
 ) {
     val messages by viewModel.messages.collectAsState()
@@ -43,16 +39,18 @@ fun ChatScreen(
     val isOffline by viewModel.isOffline.collectAsState()
     var inputText by remember { mutableStateOf("") }
     var nearbyBuilding by remember { mutableStateOf<String?>(null) }
+    var permissionRequested by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    // Solicitar permisos de ubicación
+    // Callback cuando el usuario responde al diálogo de permisos
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            // Recargar para intentar obtener ubicación
-            kotlinx.coroutines.GlobalScope.launch {
+            scope.launch {
                 val building = LocationHelper.getNearbyBuilding(context)
+                android.util.Log.d("ChatScreen", "Permission granted, nearby building: $building")
                 nearbyBuilding = building
                 if (building != null) {
                     BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
@@ -63,19 +61,18 @@ fun ChatScreen(
                     )
                 }
             }
+        } else {
+            android.util.Log.d("ChatScreen", "Location permission denied")
         }
     }
 
+    // Cargar thread y ubicación
     LaunchedEffect(otherId) {
-        android.util.Log.d("ChatScreen", "Loading thread - otherId=$otherId, iAmBuyer=$iAmBuyer")
-
-        // Pasamos iAmBuyer para que el ViewModel sepa qué endpoint usar desde el inicio
         viewModel.loadThread(otherId, iAmBuyer)
 
-        // Verificar permisos y obtener ubicación
         if (LocationHelper.hasPermission(context)) {
             val building = LocationHelper.getNearbyBuilding(context)
-            android.util.Log.d("ChatScreen", "Nearby building: $building")
+            android.util.Log.d("ChatScreen", "Has permission, nearby building: $building")
             nearbyBuilding = building
             if (building != null) {
                 BusinessAnalyticsProvider.tracker.trackCampusBannerShown(
@@ -86,7 +83,16 @@ fun ChatScreen(
                 )
             }
         } else {
-            android.util.Log.d("ChatScreen", "Location permission not granted, requesting...")
+            // Marcar que necesitamos pedir permiso (se hace fuera del LaunchedEffect)
+            permissionRequested = true
+        }
+    }
+
+    // Pedir permiso fuera del LaunchedEffect para que funcione correctamente con Compose
+    LaunchedEffect(permissionRequested) {
+        if (permissionRequested) {
+            permissionRequested = false
+            android.util.Log.d("ChatScreen", "Requesting location permission...")
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
@@ -129,7 +135,7 @@ fun ChatScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "📍 You are near $nearbyBuilding",
+                            text = "\uD83D\uDCCD You are near $nearbyBuilding",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -172,7 +178,6 @@ fun ChatScreen(
                 IconButton(
                     onClick = {
                         if (inputText.isNotBlank()) {
-                            // Pasamos iAmBuyer para que el ViewModel use el endpoint correcto
                             viewModel.sendMessage(otherId, inputText, iAmBuyer)
                             inputText = ""
                         }
