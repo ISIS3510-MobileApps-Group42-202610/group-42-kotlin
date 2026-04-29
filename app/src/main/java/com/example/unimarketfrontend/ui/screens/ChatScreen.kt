@@ -66,8 +66,8 @@ fun ChatScreen(
         }
     }
 
-    // Cargar thread y ubicación
-    LaunchedEffect(otherId) {
+    // Cargar thread y ubicación — Unit para que se ejecute cada vez que entras
+    LaunchedEffect(Unit) {
         viewModel.loadThread(otherId, iAmBuyer)
 
         if (LocationHelper.hasPermission(context)) {
@@ -83,7 +83,6 @@ fun ChatScreen(
                 )
             }
         } else {
-            // Marcar que necesitamos pedir permiso (se hace fuera del LaunchedEffect)
             permissionRequested = true
         }
     }
@@ -135,7 +134,7 @@ fun ChatScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "\uD83D\uDCCD You are near $nearbyBuilding",
+                            text = "You are near $nearbyBuilding",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -157,7 +156,11 @@ fun ChatScreen(
                 reverseLayout = true
             ) {
                 items(messages.reversed()) { message ->
-                    ChatBubble(content = message.content, isMine = message.isMine)
+                    ChatBubble(
+                        content = message.content,
+                        isMine = message.isMine,
+                        isPending = message.sentBy == "pending"
+                    )
                 }
             }
 
@@ -196,7 +199,7 @@ fun ChatScreen(
 }
 
 @Composable
-private fun ChatBubble(content: String, isMine: Boolean) {
+private fun ChatBubble(content: String, isMine: Boolean, isPending: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -205,16 +208,26 @@ private fun ChatBubble(content: String, isMine: Boolean) {
     ) {
         Surface(
             shape = MaterialTheme.shapes.medium,
-            color = if (isMine) MaterialTheme.colorScheme.primary
+            color = if (isPending) MaterialTheme.colorScheme.surfaceVariant
+            else if (isMine) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
-            Text(
-                text = content,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                color = if (isMine) MaterialTheme.colorScheme.onPrimary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(
+                    text = content,
+                    color = if (isPending) MaterialTheme.colorScheme.onSurfaceVariant
+                    else if (isMine) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (isPending) {
+                    Text(
+                        text = "Pending - will send when online",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
         }
     }
 }
