@@ -246,6 +246,7 @@ class ListingDetailViewModel(
     }
 
     fun markAsSold(
+        rating: Int,
         onComplete: () -> Unit,
         onError: (String) -> Unit = {}
     ) {
@@ -261,7 +262,7 @@ class ListingDetailViewModel(
             try {
                 repository.markAsSoldRemotely(listingId)
                 repository.markAsSoldLocally(listingId)
-                trackTransactionCompleted()
+                trackTransactionCompleted(rating = rating)
                 loadListing(forceLoading = false)
                 onComplete()
             } catch (e: Exception) {
@@ -321,12 +322,13 @@ class ListingDetailViewModel(
         responseTimeMinutes: Int? = null
     ) {
         if (transactionTracked) return
+        transactionTracked = true
 
         val state = uiState.value as? ListingDetailUiState.Success ?: return
         val listing = state.listing
         val seller = state.seller
 
-        transactionTracked = true
+        val resolvedRating = rating ?: 0
 
         BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
             listingId = listing.id,
@@ -338,7 +340,7 @@ class ListingDetailViewModel(
                 "selling_price" to listing.selling_price.toString(),
                 "semester" to (seller?.semester?.toString() ?: "unknown"),
                 "seller_id" to listing.seller_id.toString(),
-                "rating" to (rating ?: 0).toString(),
+                "rating" to resolvedRating.toString(),
                 "response_time_minutes" to (responseTimeMinutes ?: 0).toString()
             )
         )
