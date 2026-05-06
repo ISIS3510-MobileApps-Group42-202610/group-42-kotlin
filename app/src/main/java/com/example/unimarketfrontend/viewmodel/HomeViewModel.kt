@@ -88,7 +88,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 coroutineScope {
                     val userDeferred = async {
-                        runCatching { RetrofitInstance.api.getMe().name }.getOrDefault("there")
+                        runCatching {
+                            val me = RetrofitInstance.api.getMe()
+                            // Set analytics user ID whenever we fetch the user
+                            com.example.unimarketfrontend.model.utils.analytics.AnalyticsLogger.setUserId(me.id)
+                            me.name
+                        }.getOrDefault("there")
                     }
                     val homeDataDeferred = async {
                         homeRepository.refreshHomeData()

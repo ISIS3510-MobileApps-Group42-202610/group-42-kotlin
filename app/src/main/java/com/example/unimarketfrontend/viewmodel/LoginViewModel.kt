@@ -27,6 +27,12 @@ class LoginViewModel : ViewModel() {
                 AnalyticsConfig.authMode = AnalyticsAuthMode.Bearer
                 AnalyticsConfig.authToken = response.access_token
 
+                // Set user ID for analytics after successful login
+                try {
+                    val me = RetrofitInstance.api.getMe()
+                    com.example.unimarketfrontend.model.utils.analytics.AnalyticsLogger.setUserId(me.id)
+                } catch (_: Exception) { }
+
                 onSuccess()
 
             } catch (e: Exception) {
