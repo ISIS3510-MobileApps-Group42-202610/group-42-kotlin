@@ -219,8 +219,18 @@ fun ListingDetailScreen(
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                vm.trackTransactionCompleted(rating = selectedRating)
                                 showRatingDialog = false
+                                val ratingSnapshot = selectedRating
+                                vm.markAsSold(
+                                    rating = ratingSnapshot,
+                                    onComplete = {
+                                        actionError = null
+                                        navController.popBackStack()
+                                    },
+                                    onError = { error ->
+                                        actionError = error
+                                    }
+                                )
                             }
                         ) { Text("Finalizar") }
                     },
@@ -377,15 +387,8 @@ fun ListingDetailScreen(
                     if (current.canMarkAsSold) {
                         Button(
                             onClick = {
-                                vm.markAsSold(
-                                    onComplete = {
-                                        actionError = null
-                                        navController.popBackStack()
-                                    },
-                                    onError = { error ->
-                                        actionError = error
-                                    }
-                                )
+                                selectedRating = 5
+                                showRatingDialog = true
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
