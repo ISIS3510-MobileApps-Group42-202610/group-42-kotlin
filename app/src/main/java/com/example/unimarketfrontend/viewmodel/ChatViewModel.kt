@@ -23,7 +23,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _otherId = MutableStateFlow<Int?>(null)
 
-    // Guardamos el rol para usarlo en sendMessage sin tener que pasarlo de nuevo
     private var currentIAmBuyer: Boolean = true
 
     val isOffline: StateFlow<Boolean> = ConnectivityMonitor.isOnline
@@ -33,19 +32,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _isSending = MutableStateFlow(false)
     val isSending: StateFlow<Boolean> = _isSending
 
-    // Observa Room directamente — cuando refreshThread inserta mensajes,
-    // el Flow emite automáticamente y la UI se actualiza
     val messages: StateFlow<List<MessageEntity>> = _otherId
         .filterNotNull()
         .flatMapLatest { id -> repository.observeMessages(id) }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // iAmBuyer se pasa desde ChatScreen y ya no depende de la consulta a Room
     fun loadThread(otherId: Int, iAmBuyer: Boolean) {
         currentIAmBuyer = iAmBuyer
         _otherId.value = otherId
         viewModelScope.launch {
-            // refreshThread ya sabe qué endpoint usar gracias a iAmBuyer
             repository.refreshThread(otherId, iAmBuyer)
         }
     }
@@ -54,38 +49,33 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (content.isBlank()) return
         currentIAmBuyer = iAmBuyer
 
-        android.util.Log.d("ChatViewModel", "sendMessage called - otherId=$otherId, iAmBuyer=$iAmBuyer, content='$content'")
-
         viewModelScope.launch {
             _isSending.value = true
+            val isOnline = ConnectivityMonitor.isOnline.value
+            android.util.Log.d("ChatViewModel", "sendMessage: otherId=$otherId, iAmBuyer=$iAmBuyer, isOnline=$isOnline")
+
+            if (!isOnline) {
+                // Offline: guardar como pendiente y mostrar en UI
+                android.util.Log.d("ChatViewModel", "OFFLINE - saving as pending")
+                repository.savePendingMessage(otherId, content)
+                _isSending.value = false
+                return@launch
+            }
 
             try {
-                if (ConnectivityMonitor.isOnline.value) {
-                    android.util.Log.d("ChatViewModel", "Online - sending message to server")
+                repository.sendMessage(otherId, content, iAmBuyer)
+                repository.refreshThread(otherId, iAmBuyer)
 
-                    // Enviar mensaje al servidor
-                    val sentMessage = repository.sendMessage(otherId, content, iAmBuyer)
-                    android.util.Log.d("ChatViewModel", "Message sent successfully: ${sentMessage.id}")
-
-                    // Refresh inmediato para que el mensaje aparezca en la UI
-                    val refreshSuccess = repository.refreshThread(otherId, iAmBuyer)
-                    android.util.Log.d("ChatViewModel", "Thread refresh result: $refreshSuccess")
-
-                    AnalyticsLogger.log(
-                        "message_sent",
-                        mapOf(
-                            "other_id" to otherId.toString(),
-                            "role" to if (iAmBuyer) "buyer" else "seller"
-                        )
+                AnalyticsLogger.log(
+                    "message_sent",
+                    mapOf(
+                        "other_id" to otherId.toString(),
+                        "role" to if (iAmBuyer) "buyer" else "seller"
                     )
-                } else {
-                    // Sin conexión: guardar como pendiente
-                    repository.savePendingMessage(otherId, content)
-                    android.util.Log.d("ChatViewModel", "Message saved as pending (offline)")
-                }
+                )
             } catch (e: Exception) {
-                // Si falla el envío, guardar como pendiente
-                android.util.Log.e("ChatViewModel", "Error sending message: ${e.message}", e)
+                // Network error: guardar como pendiente
+                android.util.Log.e("ChatViewModel", "Send failed, saving as pending: ${e.message}")
                 repository.savePendingMessage(otherId, content)
             } finally {
                 _isSending.value = false

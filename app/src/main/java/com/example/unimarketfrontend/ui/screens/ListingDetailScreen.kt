@@ -166,8 +166,15 @@ fun ListingDetailScreen(
                                             messageText = ""
                                             showMessageDialog = false
                                             errorText = null
-                                            // Navegamos al chat bilateral
-                                            navController.navigate("chat/${listing.seller_id}/${seller?.name ?: "Vendedor"}")
+                                            // Navegamos al chat bilateral con el rol correcto
+                                            val iAmBuyer = !current.isOwner
+                                            navController.navigate(
+                                                ChatRoutesFactory.chatPath(
+                                                    otherId = listing.seller_id,
+                                                    otherName = seller?.let { "${it.name} ${it.last_name}".trim() } ?: "Vendedor",
+                                                    iAmBuyer = iAmBuyer
+                                                )
+                                            )
                                         },
                                         onError = { error ->
                                             errorText = error //  Mostramos el error real
@@ -391,20 +398,8 @@ fun ListingDetailScreen(
                     if (contactTargetId != null) {
                         Button(
                             onClick = {
-                                // Determinar si soy comprador o vendedor
-                                val iAmBuyer = !current.isOwner
-
-                                android.util.Log.d("ListingDetailScreen", "Contact button clicked - targetId=$contactTargetId, iAmBuyer=$iAmBuyer")
-
-                                // Navegar directamente al chat con el rol correcto
-                                navController.navigate(
-                                    ChatRoutesFactory.chatPath(
-                                        otherId = contactTargetId,
-                                        otherName = contactTargetName ?: "Usuario",
-                                        iAmBuyer = iAmBuyer
-                                    )
-                                )
-
+                                showMessageDialog = true
+                                messageError = null
                                 vm.trackChatStarted()
                             },
                             modifier = Modifier.fillMaxWidth(),

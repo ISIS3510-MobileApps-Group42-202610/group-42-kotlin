@@ -45,4 +45,16 @@ interface MessagesDao {
 
     @Query("DELETE FROM messages WHERE conversationWithId = :otherId")
     suspend fun clearMessagesWith(otherId: Int)
+
+    // Borrar solo mensajes del servidor (ID >= 0), mantener pendientes locales (ID < 0)
+    @Query("DELETE FROM messages WHERE conversationWithId = :otherId AND id >= 0")
+    suspend fun clearServerMessagesWith(otherId: Int)
+
+    // Borrar solo mensajes pendientes locales (ID < 0)
+    @Query("DELETE FROM messages WHERE conversationWithId = :otherId AND id < 0")
+    suspend fun clearPendingMessagesWith(otherId: Int)
+
+    // Contar mensajes pendientes locales
+    @Query("SELECT COUNT(*) FROM messages WHERE conversationWithId = :otherId AND id < 0")
+    suspend fun countPendingMessagesWith(otherId: Int): Int
 }

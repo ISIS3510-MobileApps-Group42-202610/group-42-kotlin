@@ -46,7 +46,7 @@ fun AppNavigation() {
             composable("createListing") { CreateListingScreen(navController) }
 
             composable(
-                route = "listing/{listingId}",
+                route = ListingRoutesFactory.DETAIL_ROUTE,
                 arguments = listOf(navArgument("listingId") { type = NavType.IntType })
             ) { backStackEntry ->
                 val listingId = backStackEntry.arguments?.getInt("listingId") ?: -1

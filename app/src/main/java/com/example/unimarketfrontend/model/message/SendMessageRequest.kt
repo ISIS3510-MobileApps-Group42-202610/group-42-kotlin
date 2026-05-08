@@ -7,3 +7,10 @@ data class SendMessageRequest(
     val seller_id: Int,
     val content: String
 )
+
+// Cuerpo del POST cuando el vendedor responde a un comprador
+// buyer_id: a qué comprador (user ID) le mandamos el mensaje
+data class SendMessageAsSellerRequest(
+    val buyer_id: Int,
+    val content: String
+)
