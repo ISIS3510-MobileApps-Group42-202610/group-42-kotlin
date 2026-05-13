@@ -13,6 +13,7 @@ import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.ListingCacheThenNetworkResult
 import com.example.unimarketfrontend.model.repository.ListingRepository
+import com.example.unimarketfrontend.model.repository.WishlistRepository
 import com.example.unimarketfrontend.model.user.User
 import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.model.utils.ErrorTranslator
@@ -36,7 +37,8 @@ sealed class ListingDetailUiState {
         val hasExternalComments: Boolean,
         val externalCommentsCount: Int,
         val reviews: List<Review>,
-        val ratingSummary: RatingSummaryUi
+        val ratingSummary: RatingSummaryUi,
+        val isInWishlist: Boolean = false
     ) : ListingDetailUiState()
 
     data class Error(val message: String) : ListingDetailUiState()
@@ -55,6 +57,8 @@ class ListingDetailViewModel(
     private val repository = ListingRepository(
         listingDao = AppDatabase.getInstance(application).listingDao()
     )
+    
+    private val wishlistRepository = WishlistRepository(application)
 
     private val _uiState = MutableStateFlow<ListingDetailUiState>(ListingDetailUiState.Loading)
     val uiState: StateFlow<ListingDetailUiState> = _uiState
@@ -164,6 +168,8 @@ class ListingDetailViewModel(
             currentUser = currentUser,
             reviews = reviews
         )
+        
+        val isInWishlist = wishlistRepository.isInWishlist(listing.id)
 
         _uiState.value = ListingDetailUiState.Success(
             listing = listing,
@@ -177,7 +183,8 @@ class ListingDetailViewModel(
             hasExternalComments = actionState.hasExternalComments,
             externalCommentsCount = actionState.externalCommentsCount,
             reviews = reviews,
-            ratingSummary = ratingSummary
+            ratingSummary = ratingSummary,
+            isInWishlist = isInWishlist
         )
     }
 
@@ -341,9 +348,36 @@ class ListingDetailViewModel(
                 "semester" to (seller?.semester?.toString() ?: "unknown"),
                 "seller_id" to listing.seller_id.toString(),
                 "rating" to resolvedRating.toString(),
-                "response_time_minutes" to (responseTimeMinutes ?: 0).toString()
+                "response_time_minutes" to (responseTimeMinutes ?: 0).toString(),
+                "is_from_wishlist" to state.isInWishlist.toString() // SPRINT 4 BQ7
             )
         )
+    }
+    
+    fun toggleWishlist() {
+        val currentState = _uiState.value as? ListingDetailUiState.Success ?: return
+        viewModelScope.launch {
+            if (currentState.isInWishlist) {
+                wishlistRepository.removeFromWishlist(listingId)
+                BusinessAnalyticsProvider.tracker.trackWishlistItemRemoved(
+                    listingId = listingId,
+                    sellerId = currentState.listing.seller_id,
+                    metadata = mapOf("source" to "listing_detail")
+                )
+            } else {
+                wishlistRepository.addToWishlist(currentState.listing)
+                BusinessAnalyticsProvider.tracker.trackWishlistItemAdded(
+                    listingId = listingId,
+                    sellerId = currentState.listing.seller_id,
+                    metadata = mapOf(
+                        "category" to (currentState.listing.category ?: "unknown"),
+                        "price" to currentState.listing.selling_price.toString()
+                    )
+                )
+            }
+            // Update state locally
+            _uiState.value = currentState.copy(isInWishlist = !currentState.isInWishlist)
+        }
     }
 }
 

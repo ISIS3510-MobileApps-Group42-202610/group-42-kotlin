@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.unimarketfrontend.model.local.dao.ListingDao
 import com.example.unimarketfrontend.model.local.dao.MessagesDao
+import com.example.unimarketfrontend.model.local.dao.WishlistDao
+import com.example.unimarketfrontend.model.local.dao.PendingWishlistDao
 
 /*
  * Esta es la base de datos principal de la app usando Room.
@@ -17,15 +19,19 @@ import com.example.unimarketfrontend.model.local.dao.MessagesDao
         ListingEntity::class,
         ConversationEntity::class,
         PendingMessageEntity::class,
-        MessageEntity::class // SPRINT 3: Tabla para el historial bilateral de mensajes
+        MessageEntity::class,
+        WishlistEntity::class, // SPRINT 4: Tabla para favoritos
+        PendingWishlistEntity::class // SPRINT 4: Acciones pendientes offline
     ],
-    version = 6, // Subimos a la version 5 por la nueva tabla MessageEntity
+    version = 8, // Subimos a la version 8 para incluir PendingWishlistEntity
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun listingDao(): ListingDao
     abstract fun messagesDao(): MessagesDao
+    abstract fun wishlistDao(): WishlistDao
+    abstract fun pendingWishlistDao(): PendingWishlistDao
 
     companion object {
         @Volatile

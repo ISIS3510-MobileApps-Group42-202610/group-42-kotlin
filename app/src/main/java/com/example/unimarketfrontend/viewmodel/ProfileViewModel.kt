@@ -1,18 +1,27 @@
 package com.example.unimarketfrontend.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.listing.ListingImage
 import com.example.unimarketfrontend.model.listing.Purchase
 import com.example.unimarketfrontend.model.repository.AuthRepository
+import com.example.unimarketfrontend.model.repository.WishlistRepository
 import com.example.unimarketfrontend.model.user.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class ProfileViewModel : ViewModel() {
+/**
+ * SPRINT 4 — ProfileViewModel
+ * Updated to use WishlistRepository for reactive local storage.
+ */
+class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository()
+    private val wishlistRepository = WishlistRepository(application)
 
     private val _user      = MutableStateFlow<User?>(null)
     val user: StateFlow<User?> = _user
@@ -32,7 +41,45 @@ class ProfileViewModel : ViewModel() {
     private val _errorMsg  = MutableStateFlow<String?>(null)
     val errorMsg: StateFlow<String?> = _errorMsg
 
-    init { loadProfile() }
+    init { 
+        loadProfile()
+        observeWishlist()
+    }
+
+    private fun observeWishlist() {
+        viewModelScope.launch {
+            wishlistRepository.observeWishlist().collectLatest { entities ->
+                _wishlist.value = entities.map { entity ->
+                    Listing(
+                        id = entity.listingId,
+                        seller_id = entity.sellerId,
+                        owner_user_id = null,
+                        buyer_id = null,
+                        course_id = null,
+                        title = entity.title,
+                        product = null,
+                        category = entity.category,
+                        condition = entity.condition,
+                        original_price = null,
+                        selling_price = entity.sellingPrice,
+                        created_at = "",
+                        updated_at = "",
+                        active = entity.active,
+                        images = if (entity.imageUrl != null) listOf(
+                            ListingImage(
+                                id = 0,
+                                listing_id = entity.listingId,
+                                is_primary = true,
+                                uploaded_at = "",
+                                url = entity.imageUrl
+                            )
+                        ) else emptyList(),
+                        priceHistory = null
+                    )
+                }
+            }
+        }
+    }
 
     fun loadProfile() {
         viewModelScope.launch {
@@ -43,11 +90,12 @@ class ProfileViewModel : ViewModel() {
             } catch (e: Exception) {
                 _errorMsg.value = "Error getting user: ${e.message}"
             }
-            try {
-                _wishlist.value = authRepository.getWishlist()
-            } catch (e: Exception) {
-
+            
+            // Background refresh to ensure cache is fresh
+            launch {
+                wishlistRepository.refreshFromNetwork()
             }
+
             try {
                 val response = authRepository.getPurchases()
                 _purchases.value = response.purchases ?: emptyList()
@@ -64,8 +112,7 @@ class ProfileViewModel : ViewModel() {
     fun removeFromWishlist(listingId: Int) {
         viewModelScope.launch {
             try {
-                authRepository.removeFromWishlist(listingId)
-                _wishlist.value = _wishlist.value.filter { it.id != listingId }
+                wishlistRepository.removeFromWishlist(listingId)
             } catch (e: Exception) {
                 _errorMsg.value = "Error trying to delete from wishlist"
             }

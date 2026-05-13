@@ -5,18 +5,30 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.ListingRepository
+import com.example.unimarketfrontend.model.repository.WishlistRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/**
+ * SPRINT 4 — SearchViewModel
+ * Updated to include Wishlist integration for quick actions from search results.
+ */
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = ListingRepository(
         listingDao = AppDatabase.getInstance(application).listingDao()
     )
+    
+    private val wishlistRepository = WishlistRepository(application)
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query
@@ -26,6 +38,11 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
+
+    // SPRINT 4: Set of IDs in the wishlist for fast lookup
+    val wishlistIds: StateFlow<Set<Int>> = wishlistRepository.observeWishlist()
+        .map { list -> list.map { it.listingId }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
 
     private var allListings: List<Listing> = emptyList()
     private var debounceJob: Job? = null
@@ -81,6 +98,30 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     listing.condition?.lowercase()?.contains(lower) == true ||
                     listing.product?.lowercase()?.contains(lower) == true
                 )
+        }
+    }
+
+    fun toggleWishlist(listing: Listing) {
+        val isInWishlist = wishlistIds.value.contains(listing.id)
+        viewModelScope.launch {
+            if (isInWishlist) {
+                wishlistRepository.removeFromWishlist(listing.id)
+                BusinessAnalyticsProvider.tracker.trackWishlistItemRemoved(
+                    listingId = listing.id,
+                    metadata = mapOf("source" to "search_results")
+                )
+            } else {
+                wishlistRepository.addToWishlist(listing)
+                BusinessAnalyticsProvider.tracker.trackWishlistItemAdded(
+                    listingId = listing.id,
+                    sellerId = listing.seller_id,
+                    metadata = mapOf(
+                        "category" to (listing.category ?: "unknown"),
+                        "price" to listing.selling_price.toString(),
+                        "source" to "search_results"
+                    )
+                )
+            }
         }
     }
 }

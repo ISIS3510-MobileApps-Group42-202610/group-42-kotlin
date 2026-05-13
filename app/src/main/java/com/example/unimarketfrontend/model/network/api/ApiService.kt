@@ -52,6 +52,9 @@ interface ApiService {
     @GET("api/v1/users/me/wishlist")
     suspend fun getWishlist(): List<Listing>
 
+    @POST("api/v1/users/me/wishlist/{listingId}")
+    suspend fun addToWishlist(@Path("listingId") listingId: Int)
+
     @GET("api/v1/users/me/purchases")
     suspend fun getPurchases(): UserWithPurchases
 
