@@ -9,14 +9,10 @@ import com.example.unimarketfrontend.model.network.api.ApiService
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.network.api.AnalyticsApiService
 import com.example.unimarketfrontend.model.network.client.AnalyticsRetrofitInstance
-import com.example.unimarketfrontend.model.network.interceptor.AnalyticsAuthInterceptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,36 +70,28 @@ class BusinessAnalyticsTracker(
         AnalyticsConfig.businessEventFlags[eventName.value] = enabled
     }
 
-    fun trackListingViewed(
-        listingId: Int,
-        sellerId: Int?,
-        metadata: Map<String, Any?>? = null
-    ) {
+    fun trackListingViewed(listingId: Int, sellerId: Int?, metadata: Map<String, Any?>? = null) {
         trackEvent(BusinessEventName.LISTING_VIEWED, listingId, sellerId, metadata)
     }
 
-    fun trackChatStarted(
-        listingId: Int,
-        sellerId: Int?,
-        metadata: Map<String, Any?>? = null
-    ) {
+    fun trackChatStarted(listingId: Int, sellerId: Int?, metadata: Map<String, Any?>? = null) {
         trackEvent(BusinessEventName.CHAT_STARTED, listingId, sellerId, metadata)
     }
 
-    fun trackFirstMessageSent(
-        listingId: Int,
-        sellerId: Int?,
-        metadata: Map<String, Any?>? = null
-    ) {
+    fun trackFirstMessageSent(listingId: Int, sellerId: Int?, metadata: Map<String, Any?>? = null) {
         trackEvent(BusinessEventName.FIRST_MESSAGE_SENT, listingId, sellerId, metadata)
     }
 
-    fun trackTransactionCompleted(
-        listingId: Int,
-        sellerId: Int?,
-        metadata: Map<String, Any?>? = null
-    ) {
+    fun trackTransactionCompleted(listingId: Int, sellerId: Int?, metadata: Map<String, Any?>? = null) {
         trackEvent(BusinessEventName.TRANSACTION_COMPLETED, listingId, sellerId, metadata)
+    }
+
+    fun trackWishlistItemAdded(listingId: Int, sellerId: Int?, metadata: Map<String, Any?>? = null) {
+        trackEvent(BusinessEventName.WISHLIST_ITEM_ADDED, listingId, sellerId, metadata)
+    }
+
+    fun trackWishlistItemRemoved(listingId: Int, metadata: Map<String, Any?>? = null) {
+        trackEvent(BusinessEventName.WISHLIST_ITEM_REMOVED, listingId, null, metadata)
     }
 
     fun trackPerformance(

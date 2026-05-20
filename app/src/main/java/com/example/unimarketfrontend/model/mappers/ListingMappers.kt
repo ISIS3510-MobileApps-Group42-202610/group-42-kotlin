@@ -3,10 +3,10 @@ package com.example.unimarketfrontend.model.mappers
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.ListingImage
 import com.example.unimarketfrontend.model.local.ListingEntity
+import com.example.unimarketfrontend.model.local.WishlistEntity
 
 fun Listing.toEntity(): ListingEntity {
     val primaryUrl = images?.firstOrNull { it.is_primary }?.url ?: images?.firstOrNull()?.url
-
     return ListingEntity(
         id = id,
         sellerId = seller_id,
@@ -32,7 +32,7 @@ fun ListingEntity.toListing(): Listing {
     return Listing(
         id = id,
         seller_id = sellerId,
-        owner_user_id = ownerUserId, // Mapeo del nuevo campo
+        owner_user_id = ownerUserId,
         buyer_id = buyerId,
         course_id = courseId,
         title = title,
@@ -60,3 +60,35 @@ fun ListingEntity.toListing(): Listing {
 }
 
 fun List<ListingEntity>.toListings(): List<Listing> = map { it.toListing() }
+
+/** SPRINT 4: Mapper para convertir favoritos de Room a objetos de dominio */
+fun WishlistEntity.toListing(): Listing {
+    return Listing(
+        id = listingId,
+        seller_id = sellerId,
+        owner_user_id = null,
+        buyer_id = null,
+        course_id = null,
+        title = title,
+        product = null,
+        category = category,
+        condition = condition,
+        original_price = null,
+        selling_price = sellingPrice,
+        created_at = "",
+        updated_at = "",
+        active = active,
+        images = imageUrl?.let {
+            listOf(
+                ListingImage(
+                    id = 0,
+                    listing_id = listingId,
+                    is_primary = true,
+                    uploaded_at = "",
+                    url = it
+                )
+            )
+        },
+        priceHistory = emptyList()
+    )
+}

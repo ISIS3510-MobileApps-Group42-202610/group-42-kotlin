@@ -1,18 +1,27 @@
 package com.example.unimarketfrontend.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Purchase
+import com.example.unimarketfrontend.model.mappers.toListing
 import com.example.unimarketfrontend.model.repository.AuthRepository
+import com.example.unimarketfrontend.model.repository.WishlistRepository
 import com.example.unimarketfrontend.model.user.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class ProfileViewModel : ViewModel() {
+/**
+ * SPRINT 4 — ProfileViewModel
+ * Updated to use WishlistRepository for reactive local storage (Tank Architecture).
+ */
+class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository()
+    private val wishlistRepository = WishlistRepository(application)
 
     private val _user      = MutableStateFlow<User?>(null)
     val user: StateFlow<User?> = _user
@@ -32,7 +41,18 @@ class ProfileViewModel : ViewModel() {
     private val _errorMsg  = MutableStateFlow<String?>(null)
     val errorMsg: StateFlow<String?> = _errorMsg
 
-    init { loadProfile() }
+    init { 
+        loadProfile()
+        observeWishlist()
+    }
+
+    private fun observeWishlist() {
+        viewModelScope.launch {
+            wishlistRepository.observeWishlist().collectLatest { entities ->
+                _wishlist.value = entities.map { it.toListing() }
+            }
+        }
+    }
 
     fun loadProfile() {
         viewModelScope.launch {
@@ -43,11 +63,12 @@ class ProfileViewModel : ViewModel() {
             } catch (e: Exception) {
                 _errorMsg.value = "Error getting user: ${e.message}"
             }
-            try {
-                _wishlist.value = authRepository.getWishlist()
-            } catch (e: Exception) {
-
+            
+            // Trigger a network refresh to ensure local cache is up to date
+            launch {
+                wishlistRepository.refreshFromNetwork()
             }
+
             try {
                 val response = authRepository.getPurchases()
                 _purchases.value = response.purchases ?: emptyList()
@@ -64,8 +85,8 @@ class ProfileViewModel : ViewModel() {
     fun removeFromWishlist(listingId: Int) {
         viewModelScope.launch {
             try {
-                authRepository.removeFromWishlist(listingId)
-                _wishlist.value = _wishlist.value.filter { it.id != listingId }
+                wishlistRepository.removeFromWishlist(listingId)
+                // UI will update automatically via Flow observation
             } catch (e: Exception) {
                 _errorMsg.value = "Error trying to delete from wishlist"
             }
