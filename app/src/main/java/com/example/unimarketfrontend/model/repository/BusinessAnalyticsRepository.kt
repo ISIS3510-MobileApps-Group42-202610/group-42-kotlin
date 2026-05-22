@@ -193,6 +193,30 @@ class BusinessAnalyticsTracker(
             } catch (e: Exception) { }
         }
     }
+
+    fun trackCustomEvent(
+        eventName: String,
+        listingId: Int = 0,
+        sellerId: Int? = null,
+        metadata: Map<String, Any?>? = null
+    ) {
+        scope.launch {
+            val buyerId = resolveCurrentUserId()
+            val event = BusinessEventRequest(
+                event_name = eventName,
+                listing_id = listingId,
+                buyer_user_id = buyerId,
+                seller_user_id = sellerId,
+                timestamp = nowIsoUtc(),
+                metadata = metadata,
+                client_event_id = buildClientEventId(eventName, listingId)
+            )
+            repository.sendEvent(event).onFailure {
+                Log.e("AnalyticsTracker", "Event Error ($eventName): ${it.message}", it)
+            }
+        }
+    }
+
     private fun nowIsoUtc(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")

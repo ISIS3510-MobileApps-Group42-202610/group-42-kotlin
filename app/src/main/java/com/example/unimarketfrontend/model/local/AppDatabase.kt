@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.unimarketfrontend.model.local.dao.CourseDao
 import com.example.unimarketfrontend.model.local.dao.ListingDao
 import com.example.unimarketfrontend.model.local.dao.MessagesDao
 
@@ -15,17 +16,19 @@ import com.example.unimarketfrontend.model.local.dao.MessagesDao
 @Database(
     entities = [
         ListingEntity::class,
+        CachedCourseEntity::class,
         ConversationEntity::class,
         PendingMessageEntity::class,
         MessageEntity::class // SPRINT 3: Tabla para el historial bilateral de mensajes
     ],
-    version = 6, // Subimos a la version 5 por la nueva tabla MessageEntity
+    version = 7, // Subimos la version por la nueva tabla CachedCourseEntity
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun listingDao(): ListingDao
     abstract fun messagesDao(): MessagesDao
+    abstract fun courseDao(): CourseDao
 
     companion object {
         @Volatile

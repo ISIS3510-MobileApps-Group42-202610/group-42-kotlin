@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
@@ -247,6 +249,15 @@ fun ListingDetailScreen(
                         navigationIcon = {
                             IconButton(onClick = { navController.popBackStack() }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = { vm.toggleWishlist() }) {
+                                Icon(
+                                    imageVector = if (current.isWishlisted) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    contentDescription = "Wishlist",
+                                    tint = if (current.isWishlisted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
                             }
                         }
                     )

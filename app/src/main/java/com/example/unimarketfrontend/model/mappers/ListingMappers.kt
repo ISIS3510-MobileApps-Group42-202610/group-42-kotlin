@@ -1,5 +1,8 @@
 package com.example.unimarketfrontend.model.mappers
 
+import com.example.unimarketfrontend.model.course.Course
+import com.example.unimarketfrontend.model.course.CourseDto
+import com.example.unimarketfrontend.model.local.CachedCourseEntity
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.ListingImage
 import com.example.unimarketfrontend.model.local.ListingEntity
@@ -60,3 +63,26 @@ fun ListingEntity.toListing(): Listing {
 }
 
 fun List<ListingEntity>.toListings(): List<Listing> = map { it.toListing() }
+
+fun CourseDto.toEntity(cachedAt: Long): CachedCourseEntity {
+    return CachedCourseEntity(
+        id = id,
+        code = code,
+        name = name,
+        faculty = faculty,
+        departmentCode = code.substringBefore("-"),
+        cachedAt = cachedAt
+    )
+}
+
+fun CachedCourseEntity.toDomain(): Course {
+    return Course(
+        id = id,
+        code = code,
+        name = name,
+        faculty = faculty,
+        departmentCode = departmentCode
+    )
+}
+
+fun List<CachedCourseEntity>.toDomainCourses(): List<Course> = map { it.toDomain() }

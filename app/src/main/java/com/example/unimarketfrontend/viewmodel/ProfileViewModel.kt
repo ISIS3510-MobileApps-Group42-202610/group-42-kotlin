@@ -3,16 +3,28 @@ package com.example.unimarketfrontend.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.listing.Listing
-import com.example.unimarketfrontend.model.listing.Purchase
 import com.example.unimarketfrontend.model.repository.AuthRepository
+import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.user.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+data class PurchaseItem(
+    val transactionId: Int,
+    val listingId: Int,
+    val title: String,
+    val price: Double,
+    val imageUrl: String?,
+    val sellerName: String?,
+    val date: String?,
+    val status: String?
+)
+
 class ProfileViewModel : ViewModel() {
 
     private val authRepository = AuthRepository()
+    private val analyticsTracker = BusinessAnalyticsProvider.tracker
 
     private val _user      = MutableStateFlow<User?>(null)
     val user: StateFlow<User?> = _user
@@ -20,8 +32,8 @@ class ProfileViewModel : ViewModel() {
     private val _wishlist  = MutableStateFlow<List<Listing>>(emptyList())
     val wishlist: StateFlow<List<Listing>> = _wishlist
 
-    private val _purchases = MutableStateFlow<List<Purchase>>(emptyList())
-    val purchases: StateFlow<List<Purchase>> = _purchases
+    private val _purchases = MutableStateFlow<List<PurchaseItem>>(emptyList())
+    val purchases: StateFlow<List<PurchaseItem>> = _purchases
 
     private val _following = MutableStateFlow<List<User>>(emptyList())
     val following: StateFlow<List<User>> = _following
@@ -50,7 +62,19 @@ class ProfileViewModel : ViewModel() {
             }
             try {
                 val response = authRepository.getPurchases()
-                _purchases.value = response.purchases ?: emptyList()
+                _purchases.value = response.purchases.orEmpty().map { purchase ->
+                    val listing = purchase.listing
+                    PurchaseItem(
+                        transactionId = purchase.id,
+                        listingId = listing?.id ?: 0,
+                        title = listing?.title ?: "Item deleted",
+                        price = listing?.selling_price ?: 0.0,
+                        imageUrl = listing?.images?.firstOrNull()?.url,
+                        sellerName = null,
+                        date = purchase.created_at,
+                        status = "Completed"
+                    )
+                }
             } catch (e: Exception) {
             }
             try {
@@ -66,9 +90,25 @@ class ProfileViewModel : ViewModel() {
             try {
                 authRepository.removeFromWishlist(listingId)
                 _wishlist.value = _wishlist.value.filter { it.id != listingId }
+                trackEvent("wishlist_removed", mapOf("listing_id" to listingId, "source_screen" to "profile"))
             } catch (e: Exception) {
                 _errorMsg.value = "Error trying to delete from wishlist"
             }
+        }
+    }
+
+    fun trackProfileWishlistViewed() {
+        trackEvent("profile_wishlist_viewed", emptyMap())
+    }
+
+    fun trackProfilePurchasesViewed() {
+        trackEvent("profile_purchases_viewed", emptyMap())
+    }
+
+    private fun trackEvent(eventName: String, metadata: Map<String, Any?>) {
+        try {
+            analyticsTracker.trackCustomEvent(eventName = eventName, metadata = metadata)
+        } catch (_: Exception) {
         }
     }
 

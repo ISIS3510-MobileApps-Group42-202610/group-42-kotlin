@@ -32,6 +32,7 @@ sealed class ListingDetailUiState {
         val contactTargetName: String?,
         val contactActionLabel: String,
         val isOwner: Boolean,
+        val isWishlisted: Boolean,
         val canMarkAsSold: Boolean,
         val hasExternalComments: Boolean,
         val externalCommentsCount: Int,
@@ -55,6 +56,8 @@ class ListingDetailViewModel(
     private val repository = ListingRepository(
         listingDao = AppDatabase.getInstance(application).listingDao()
     )
+
+    private val authRepository = com.example.unimarketfrontend.model.repository.AuthRepository()
 
     private val _uiState = MutableStateFlow<ListingDetailUiState>(ListingDetailUiState.Loading)
     val uiState: StateFlow<ListingDetailUiState> = _uiState
@@ -148,6 +151,12 @@ class ListingDetailViewModel(
             repository.getMe()
         }.getOrNull()
 
+        val wishlist = runCatching {
+            authRepository.getWishlist()
+        }.getOrNull().orEmpty()
+
+        val isWishlisted = wishlist.any { it.id == listing.id }
+
         val reviews = runCatching {
             repository.getReviews(listing.id)
         }.getOrNull()
@@ -173,6 +182,7 @@ class ListingDetailViewModel(
             contactTargetName = actionState.contactTargetName,
             contactActionLabel = actionState.contactActionLabel,
             isOwner = actionState.isOwner,
+            isWishlisted = isWishlisted,
             canMarkAsSold = actionState.canMarkAsSold,
             hasExternalComments = actionState.hasExternalComments,
             externalCommentsCount = actionState.externalCommentsCount,
@@ -243,6 +253,35 @@ class ListingDetailViewModel(
                 "message_length" to messageLength.toString()
             )
         )
+    }
+
+    fun toggleWishlist() {
+        val currentState = _uiState.value as? ListingDetailUiState.Success ?: return
+        val listingId = currentState.listing.id
+        val wasWishlisted = currentState.isWishlisted
+
+        // Optimistic UI update
+        _uiState.value = currentState.copy(isWishlisted = !wasWishlisted)
+
+        viewModelScope.launch {
+            try {
+                if (wasWishlisted) {
+                    authRepository.removeFromWishlist(listingId)
+                } else {
+                    authRepository.addToWishlist(listingId)
+                }
+                
+                val eventName = if (wasWishlisted) "wishlist_removed" else "wishlist_added"
+                BusinessAnalyticsProvider.tracker.trackCustomEvent(
+                    eventName = eventName,
+                    listingId = listingId,
+                    metadata = mapOf("source_screen" to "listing_detail")
+                )
+            } catch (e: Exception) {
+                // Revert on error
+                _uiState.value = currentState.copy(isWishlisted = wasWishlisted)
+            }
+        }
     }
 
     fun markAsSold(

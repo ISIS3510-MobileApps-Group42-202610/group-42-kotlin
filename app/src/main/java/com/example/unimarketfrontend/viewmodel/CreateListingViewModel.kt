@@ -13,6 +13,8 @@ import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
 import com.example.unimarketfrontend.model.listing.CreateListingRequest
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.repository.ListingRepository
+import com.example.unimarketfrontend.model.repository.CourseRepository
+import com.example.unimarketfrontend.model.repository.CourseResult
 import com.example.unimarketfrontend.model.utils.ErrorTranslator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -48,8 +50,13 @@ data class SmartSuggestion(
 
 data class CourseOption(
     val id: Int,
-    val name: String
-)
+    val code: String,
+    val name: String,
+    val faculty: String,
+    val departmentCode: String
+) {
+    val displayLabel: String = "$code - $name"
+}
 
 data class DraftListing(
     val title: String,
@@ -65,6 +72,14 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         listingDao = AppDatabase.getInstance(application).listingDao()
     )
 
+    private val courseRepository = CourseRepository(
+        courseDao = AppDatabase.getInstance(application).courseDao()
+    )
+
+    init {
+        loadCourses()
+    }
+
     private val prefs = application.getSharedPreferences("listing_draft", Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow<CreateListingState>(CreateListingState.Idle)
@@ -73,15 +88,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
     private val _listingCreated = MutableSharedFlow<Int>(extraBufferCapacity = 1)
     val listingCreated: SharedFlow<Int> = _listingCreated
 
-    private val _courses = MutableStateFlow(
-        listOf(
-            CourseOption(101, "Matematicas I"),
-            CourseOption(102, "Calculo"),
-            CourseOption(103, "Fisica"),
-            CourseOption(104, "Programacion"),
-            CourseOption(105, "Electronica")
-        )
-    )
+    private val _courses = MutableStateFlow<List<CourseOption>>(emptyList())
     val courses: StateFlow<List<CourseOption>> = _courses
 
     private val _selectedCourseId = MutableStateFlow<Int?>(null)
@@ -106,7 +113,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         val title = prefs.getString("title", "") ?: ""
         val description = prefs.getString("description", "") ?: ""
         val price = prefs.getString("price", "") ?: ""
-        val category = prefs.getString("category", "Books") ?: "Books"
+        val category = prefs.getString("category", "Textbooks") ?: "Textbooks"
         val urisRaw = prefs.getString("uris", "") ?: ""
 
         if (title.isBlank() && description.isBlank() && price.isBlank() && urisRaw.isBlank()) {
@@ -335,7 +342,7 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
             lower.contains("book") || lower.contains("calculus") -> {
                 SmartSuggestion(
-                    category = "Books",
+                    category = "Textbooks",
                     price = 30000.0,
                     description = "Academic textbook used for courses"
                 )
@@ -349,11 +356,11 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 )
             }
 
-            lower.contains("furniture") -> {
+            lower.contains("pen") || lower.contains("marker") || lower.contains("notebook") -> {
                 SmartSuggestion(
-                    category = "Furniture",
-                    price = 100000.0,
-                    description = "Comfortable and spacious furniture"
+                    category = "Supplies",
+                    price = 8000.0,
+                    description = "Useful supplies for university classes"
                 )
             }
 
@@ -363,6 +370,30 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                     price = 0.0,
                     description = "Good condition item for university use."
                 )
+            }
+        }
+    }
+
+    private fun loadCourses() {
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = courseRepository.getCourses()) {
+                is CourseResult.Success -> {
+                    val mapped = result.courses
+                        .sortedBy { it.code }
+                        .map { course ->
+                            CourseOption(
+                                id = course.id,
+                                code = course.code,
+                                name = course.name,
+                                faculty = course.faculty,
+                                departmentCode = course.departmentCode
+                            )
+                        }
+                    _courses.value = mapped
+                }
+                is CourseResult.Error -> {
+                    _courses.value = emptyList()
+                }
             }
         }
     }
