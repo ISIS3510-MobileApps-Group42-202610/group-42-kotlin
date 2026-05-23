@@ -201,7 +201,7 @@ class CourseRepository(
 
             val remote = response.body().orEmpty()
             val now = System.currentTimeMillis()
-            val entities = remote.map { it.toEntity(now) }
+            val entities = remote.mapNotNull { it.toEntity(now) }
             if (entities.isNotEmpty()) {
                 courseDao.clearCourses()
                 courseDao.upsertCourses(entities)
