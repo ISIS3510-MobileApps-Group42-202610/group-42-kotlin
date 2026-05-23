@@ -8,5 +8,6 @@ data class ExploreListingUiItem(
     val category: String?,
     val condition: String?,
     val courseId: Int?,
-    val courseCode: String?
+    val courseCode: String?,
+    val sellerName: String? = null
 )

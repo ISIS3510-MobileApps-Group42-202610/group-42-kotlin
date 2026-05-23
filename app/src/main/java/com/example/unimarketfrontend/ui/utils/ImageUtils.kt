@@ -1,9 +1,5 @@
 package com.example.unimarketfrontend.ui.utils
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import coil.size.SizeResolver
-
 object ImageUtils {
     /**
      * Appends Cloudinary thumbnail transformations if the URL is from Cloudinary.
@@ -11,8 +7,8 @@ object ImageUtils {
      */
     fun getThumbnailUrl(originalUrl: String?): String? {
         if (originalUrl == null) return null
-        
-        return if (originalUrl.contains("cloudinary.com")) {
+
+        return if (isCloudinaryUrl(originalUrl)) {
             // Find the /upload/ part and insert transformations
             val uploadPart = "/upload/"
             if (originalUrl.contains(uploadPart)) {
@@ -23,5 +19,9 @@ object ImageUtils {
         } else {
             originalUrl
         }
+    }
+
+    private fun isCloudinaryUrl(url: String): Boolean {
+        return url.contains("res.cloudinary.com") || url.contains(".cloudinary.com")
     }
 }

@@ -49,11 +49,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.compose.rememberConstraintsSizeResolver
 import com.example.unimarketfrontend.model.course.Course
 import com.example.unimarketfrontend.model.explore.ExploreSubcategory
 import com.example.unimarketfrontend.model.explore.ExploreSubcategoryType
@@ -73,10 +75,7 @@ import com.example.unimarketfrontend.viewmodel.ExploreUiState
 import com.example.unimarketfrontend.viewmodel.ExploreViewModel
 import java.util.Locale
 
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.platform.LocalContext
-import android.os.Trace
-import com.example.unimarketfrontend.BuildConfig
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.example.unimarketfrontend.ui.utils.ImageUtils
@@ -441,10 +440,6 @@ private fun ExploreResultsPanel(
     onRetry: () -> Unit,
     onWishlistToggle: (Int) -> Unit
 ) {
-    if (BuildConfig.DEBUG) {
-        Trace.beginSection("Explore_renderResults")
-    }
-    
     Surface(color = Color.Transparent, shadowElevation = 0.dp) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -532,10 +527,6 @@ private fun ExploreResultsPanel(
             }
         }
     }
-    
-    if (BuildConfig.DEBUG) {
-        Trace.endSection()
-    }
 }
 
 @Composable
@@ -546,9 +537,6 @@ private fun CompactExploreListingCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val thumbnailUrl = remember(item.imageUrl) { ImageUtils.getThumbnailUrl(item.imageUrl) }
-    
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -556,14 +544,8 @@ private fun CompactExploreListingCard(
         onClick = onClick
     ) {
         Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(thumbnailUrl)
-                    .crossfade(false)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .build(),
-                contentDescription = null,
+            ExploreThumbnailImage(
+                imageUrl = item.imageUrl,
                 modifier = Modifier.size(64.dp).clip(MaterialTheme.shapes.small)
             )
             Spacer(Modifier.width(10.dp))
@@ -595,6 +577,32 @@ private fun CompactExploreListingCard(
             WishlistHeartButton(isWishlisted = isWishlisted, onClick = onWishlistClick)
         }
     }
+}
+
+@Composable
+fun ExploreThumbnailImage(
+    imageUrl: String?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val thumbnailUrl = remember(imageUrl) { ImageUtils.getThumbnailUrl(imageUrl) }
+    val sizeResolver = rememberConstraintsSizeResolver()
+    val request = remember(thumbnailUrl, context) {
+        ImageRequest.Builder(context)
+            .data(thumbnailUrl)
+            .size(sizeResolver)
+            .crossfade(false)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .build()
+    }
+
+    AsyncImage(
+        model = request,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.then(sizeResolver)
+    )
 }
 
 @Composable

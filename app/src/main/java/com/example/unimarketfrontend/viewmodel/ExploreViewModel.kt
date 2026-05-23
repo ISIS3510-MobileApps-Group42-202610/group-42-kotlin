@@ -34,6 +34,7 @@ import com.example.unimarketfrontend.model.repository.AuthRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -78,7 +79,6 @@ data class ExploreFilters(
 data class ExploreUiState(
     val mode: ExploreMode = ExploreMode.CATEGORIES,
     val isLoading: Boolean = false,
-    val allListings: List<Listing> = emptyList(),
     val filteredListings: List<ExploreListingUiItem> = emptyList(),
     val courses: List<Course> = emptyList(),
     val coursesById: Map<Int, Course> = emptyMap(),
@@ -117,6 +117,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private val _uiState = MutableStateFlow(ExploreUiState(isLoading = true))
     val uiState: StateFlow<ExploreUiState> = _uiState
 
+    private var allListingsCache: List<Listing> = emptyList()
     private var lastEmptySignature: String? = null
 
     private val searchQueryFlow = MutableStateFlow("")
@@ -181,9 +182,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     is CourseResult.Error -> Triple(emptyList(), null, null)
                 }
 
+                allListingsCache = listings
+
                 val baseState = _uiState.value.copy(
                     isLoading = false,
-                    allListings = listings,
                     courses = courses,
                     wishlistListingIds = wishlistIds,
                     courseDataSource = dataSource,
@@ -496,6 +498,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     fun applyFilters() {
         val snapshot = _uiState.value
+        val listingsSnapshot = allListingsCache
         viewModelScope.launch {
             if (BuildConfig.DEBUG) {
                 Trace.beginSection("Explore_applyFilters")
@@ -504,7 +507,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val filteredItems = withContext(Dispatchers.Default) {
                     val filtered = filterListings(
-                        listings = snapshot.allListings,
+                        listings = listingsSnapshot,
                         courses = snapshot.courses,
                         filters = snapshot.appliedFilters,
                         subcategory = snapshot.selectedSubcategory
@@ -526,17 +529,20 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                             category = listing.category,
                             condition = listing.condition,
                             courseId = listing.course_id,
-                            courseCode = course?.code
+                            courseCode = course?.code,
+                            sellerName = null
                         )
                     }
                 }
 
                 val resultCount = filteredItems.size
 
-                _uiState.value = snapshot.copy(
-                    filteredListings = filteredItems,
-                    resultCount = resultCount
-                )
+                _uiState.update {
+                    it.copy(
+                        filteredListings = filteredItems,
+                        resultCount = resultCount
+                    )
+                }
 
                 if (snapshot.appliedFilters.minPrice.isNotBlank() || snapshot.appliedFilters.maxPrice.isNotBlank()) {
                     trackEvent(
@@ -629,17 +635,19 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 if (result.isFailure) {
-                    _uiState.value = _uiState.value.copy(
-                        wishlistListingIds = if (wasWishlisted) {
-                            _uiState.value.wishlistListingIds + listingId
-                        } else {
-                            _uiState.value.wishlistListingIds - listingId
-                        },
-                        errorMessage = "Could not update wishlist"
-                    )
+                    _uiState.update { current ->
+                        current.copy(
+                            wishlistListingIds = if (wasWishlisted) {
+                                current.wishlistListingIds + listingId
+                            } else {
+                                current.wishlistListingIds - listingId
+                            },
+                            errorMessage = "Could not update wishlist"
+                        )
+                    }
                 } else {
                     val eventName = if (wasWishlisted) "wishlist_removed" else "wishlist_added"
-                    val listing = snapshot.allListings.firstOrNull { it.id == listingId }
+                    val listing = allListingsCache.firstOrNull { it.id == listingId }
                     val course = listing?.course_id?.let { id -> snapshot.coursesById[id] }
                     trackEvent(
                         eventName,
@@ -845,15 +853,18 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun trackEvent(eventName: String, metadata: Map<String, String?>) {
-        val baseParams = buildExploreContextParams(_uiState.value)
-        metadata.forEach { (key, value) ->
-            if (value != null) {
-                baseParams[key] = value
+        val stateSnapshot = _uiState.value
+        viewModelScope.launch(Dispatchers.IO) {
+            val baseParams = buildExploreContextParams(stateSnapshot)
+            metadata.forEach { (key, value) ->
+                if (value != null) {
+                    baseParams[key] = value
+                }
             }
-        }
-        try {
-            analyticsTracker.trackEvent(eventName, baseParams)
-        } catch (_: Exception) {
+            try {
+                analyticsTracker.trackEvent(eventName, baseParams)
+            } catch (_: Exception) {
+            }
         }
     }
 }
