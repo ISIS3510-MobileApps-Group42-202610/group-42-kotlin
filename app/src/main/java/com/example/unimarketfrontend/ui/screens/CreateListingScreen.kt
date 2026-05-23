@@ -71,15 +71,16 @@ fun CreateListingScreen(
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
-    var isAutoDescription by remember { mutableStateOf(true) }
-    var isAutoPrice by remember { mutableStateOf(true) }
-    var isAutoCategory by remember { mutableStateOf(true) }
     var localError by remember { mutableStateOf<String?>(null) }
     var selectedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     val selectedCondition = remember { mutableStateOf(ListingCondition.NEW) }
     var selectedCategory by remember { mutableStateOf("Books") }
     var showCourseMenu by remember { mutableStateOf(false) }
+    var showAISuggestionCard by remember { mutableStateOf(true) }
+    val aiSuggestion by viewModel.aiSuggestion.collectAsState()
+    val aiErrorMessage by viewModel.aiErrorMessage.collectAsState()
+    val isAILoading by viewModel.isLoadingAI.collectAsState()
 
     var isDraftLoaded by remember { mutableStateOf(false) }
 
@@ -136,9 +137,6 @@ fun CreateListingScreen(
             selectedImageUris = draft.imageUris.mapNotNull {
                 try { Uri.parse(it) } catch (e: Exception) { null }
             }
-            isAutoDescription = false
-            isAutoPrice = false
-            isAutoCategory = false
         }
         isDraftLoaded = true
     }
@@ -155,6 +153,19 @@ fun CreateListingScreen(
             navController.previousBackStackEntry?.savedStateHandle?.set("listing_created", true)
             navController.previousBackStackEntry?.savedStateHandle?.set("listing_created_id", createdListingId)
             navController.popBackStack()
+        }
+    }
+
+    LaunchedEffect(aiSuggestion) {
+        aiSuggestion?.let { suggestion ->
+            description = suggestion.description
+            price = suggestion.price.toInt().toString()
+            val validCategories = listOf("Books", "Notes", "Electronics", "Furniture", "Other")
+            if (validCategories.contains(suggestion.category)) {
+                selectedCategory = suggestion.category
+            }
+            viewModel.markSuggestionAsAccepted(true)
+            showAISuggestionCard = false
         }
     }
 
@@ -185,9 +196,6 @@ fun CreateListingScreen(
                         price = ""
                         selectedCategory = "Books"
                         selectedImageUris = emptyList()
-                        isAutoDescription = true
-                        isAutoPrice = true
-                        isAutoCategory = true
                     }
                 },
                 modifier = Modifier.size(24.dp),
@@ -212,26 +220,84 @@ fun CreateListingScreen(
                     if (!isLoading && it.length <= MAX_TITLE_CHARS) {
                         title = it
                         localError = null
+
                         if (it.length >= 3) {
-                            val suggestion = viewModel.suggestFromText(it)
-                            if (isAutoDescription) description = suggestion.description
-                            if (isAutoPrice) price = suggestion.price.toString()
-                            if (isAutoCategory) selectedCategory = suggestion.category
+                            showAISuggestionCard = true
                         }
                     }
                 },
                 label = "Title (${title.length}/$MAX_TITLE_CHARS)",
                 modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = TextSecondary) }
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Image,
+                        contentDescription = null,
+                        tint = TextSecondary
+                    )
+                }
             )
+
+            if (title.length >= 3 && showAISuggestionCard) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    ),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 3.dp
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+
+                        Text(
+                            text = "Do you want to use AI suggestions for this listing?",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TextPrimary
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+
+                            Button(
+                                onClick = { viewModel.requestAISuggestion(title)
+                                          },
+                                enabled = !isLoading && !isAILoading
+                            ) {
+                                if (isAILoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Thinking...")
+                                } else {
+                                    Text("Yes")
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    showAISuggestionCard = false
+                                },
+                                enabled = !isLoading
+                            ) {
+                                Text("No")
+                            }
+                        }
+                    }
+                }
+            }
 
             NeumorphicTextField(
                 value = description,
                 onValueChange = {
                     if (it.length <= MAX_DESC_CHARS) {
                         description = it
-                        isAutoDescription = false
                     }
+                    viewModel.markSuggestionAsAccepted(false)
                 },
                 label = "Description (${description.length}/$MAX_DESC_CHARS)",
                 modifier = Modifier.fillMaxWidth(),
@@ -246,14 +312,24 @@ fun CreateListingScreen(
                         if (it.isEmpty() || (inputPrice != null && inputPrice <= MAX_PRICE)) {
                             price = it
                             localError = null
-                            isAutoPrice = false
                         }
                     }
+                    viewModel.markSuggestionAsAccepted(false)
                 },
                 label = "Price (Max 25M)",
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = TextSecondary) }
+
             )
+
+            if (aiErrorMessage != null) {
+                Text(
+                    text = aiErrorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -267,7 +343,7 @@ fun CreateListingScreen(
                             .background(if (selectedCategory == cat) PrimaryIndigo else Color(0xFFDDF3F0), RoundedCornerShape(12.dp))
                             .clickable(enabled = !isLoading) {
                                 selectedCategory = cat
-                                isAutoCategory = false
+                                viewModel.markSuggestionAsAccepted(false)
                             }
                             .padding(horizontal = 18.dp),
                         contentAlignment = Alignment.Center

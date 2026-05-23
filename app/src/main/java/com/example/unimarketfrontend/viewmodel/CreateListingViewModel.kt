@@ -5,8 +5,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.unimarketfrontend.BuildConfig
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.network.external.CloudinaryUploadService
 import com.example.unimarketfrontend.model.uploads.CloudinarySignatureRequest
@@ -14,6 +16,13 @@ import com.example.unimarketfrontend.model.listing.CreateListingRequest
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.utils.ErrorTranslator
+import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -86,6 +95,21 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
     private val _selectedCourseId = MutableStateFlow<Int?>(null)
     val selectedCourseId: StateFlow<Int?> = _selectedCourseId
+
+
+    private val httpClient = OkHttpClient()
+    private val aiSuggestionsCache = mutableMapOf<String, SmartSuggestion>()
+
+    private val _aiSuggestion = MutableStateFlow<SmartSuggestion?>(null)
+    val aiSuggestion: StateFlow<SmartSuggestion?> = _aiSuggestion
+
+    private val _isLoadingAI = MutableStateFlow(false)
+    val isLoadingAI: StateFlow<Boolean> = _isLoadingAI
+
+    private val _aiErrorMessage = MutableStateFlow<String?>(null)
+    val aiErrorMessage: StateFlow<String?> = _aiErrorMessage
+
+    var usedSuggestedPrice: Boolean = false
 
     fun setSelectedCourse(courseId: Int?) {
         _selectedCourseId.value = courseId
@@ -224,6 +248,9 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
 
                 listingRepository.cacheRemoteListings(listOf(listing))
                 clearDraft()
+
+                logBQ7SuggestionEvent(listing.id)
+
                 _listingCreated.tryEmit(listing.id)
                 _state.value = CreateListingState.Success
 
@@ -321,48 +348,135 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         return block()
     }
 
-    fun suggestFromText(title: String): SmartSuggestion {
-        val lower = title.lowercase()
 
-        return when {
-            lower.contains("calculator") || lower.contains("ti-84") -> {
-                SmartSuggestion(
-                    category = "Electronics",
-                    price = 50000.0,
-                    description = "Scientific calculator in good condition"
-                )
+    fun requestAISuggestion(title: String) {
+
+        val cacheKey = title.lowercase().trim()
+
+
+        if (aiSuggestionsCache.containsKey(cacheKey)) {
+            _aiSuggestion.value = aiSuggestionsCache[cacheKey]
+            _aiErrorMessage.value = null
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoadingAI.value = true
+            _aiErrorMessage.value = null
+            try {
+                val suggestion = withContext(Dispatchers.IO) {
+                    callGeminiAPI(title)
+                }
+                if (suggestion != null) {
+                    aiSuggestionsCache[cacheKey] = suggestion
+                    _aiSuggestion.value = suggestion
+                } else {
+                    _aiErrorMessage.value = "Could not connect to Gemini API. Default suggestion applied."
+                }
+            } catch (e: Exception) {
+                Log.e("GeminiAPI", "Exception in requestAISuggestion: ${e.message}", e)
+
+                _aiErrorMessage.value = "Error connecting to AI. Default suggestion applied."
+            } finally {
+                _isLoadingAI.value = false
+            }
+        }
+    }
+
+    private fun callGeminiAPI(title: String): SmartSuggestion? {
+        val geminiApiKey = BuildConfig.GEMINI_API_KEY
+
+        val prompt = """
+            You are a pricing assistant for UniMarket, a university marketplace in Colombia where students buy and sell used academic items.
+            Given this product listing title: "$title"
+            Respond ONLY with a JSON object, no markdown, no explanation:
+            {
+              "category": "one of [Books, Electronics, Notes, Furniture, Other]",
+              "price": suggested price in COP as a number,
+              "description": "a short 1-sentence product description in Spanish"
+            }
+        """.trimIndent()
+
+        val body = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("text", prompt)
+                        })
+                    })
+                })
+            })
+            put("generationConfig", JSONObject().apply {
+                put("responseMimeType", "application/json")
+            })
+        }.toString()
+
+        val request = Request.Builder()
+            .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=$geminiApiKey")
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .header("Content-Type", "application/json")
+            .build()
+
+        Log.i("GeminiAPI", "Llamando el API");
+        return try {
+            val response = httpClient.newCall(request).execute()
+            val responseBody = response.body?.string() ?: return null
+
+            if (!response.isSuccessful) {
+                Log.e("GeminiAPI", "HTTP Error ${response.code}: $responseBody")
+                return null
             }
 
-            lower.contains("book") || lower.contains("calculus") -> {
-                SmartSuggestion(
-                    category = "Books",
-                    price = 30000.0,
-                    description = "Academic textbook used for courses"
-                )
+            val jsonResponse = JSONObject(responseBody)
+
+            if (jsonResponse.has("error")) {
+                Log.e("GeminiAPI", "API Error: ${jsonResponse.getJSONObject("error").getString("message")}")
+                return null
             }
 
-            lower.contains("notes") -> {
-                SmartSuggestion(
-                    category = "Notes",
-                    price = 10000.0,
-                    description = "Well-organized study notes"
-                )
-            }
+            val text = jsonResponse.optJSONArray("candidates")
+                ?.optJSONObject(0)
+                ?.optJSONObject("content")
+                ?.optJSONArray("parts")
+                ?.optJSONObject(0)
+                ?.optString("text", "{}")?.trim() ?: "{}"
 
-            lower.contains("furniture") -> {
-                SmartSuggestion(
-                    category = "Furniture",
-                    price = 100000.0,
-                    description = "Comfortable and spacious furniture"
-                )
-            }
+            val cleanText = text.replace("```json", "", ignoreCase = true).replace("```", "").trim()
+            val result = JSONObject(cleanText)
 
-            else -> {
-                SmartSuggestion(
-                    category = "Other",
-                    price = 0.0,
-                    description = "Good condition item for university use."
+            Log.i("GeminiAPI","Result is $result")
+            SmartSuggestion(
+                category = result.optString("category", "Other"),
+                price = result.optDouble("price", 0.0),
+                description = result.optString("description", "")
+            )
+        } catch (e: Exception) {
+            Log.e("GeminiAPI", "Parsing error in callGeminiAPI: ${e.message}", e)
+            null
+        }
+    }
+
+    fun markSuggestionAsAccepted(accepted: Boolean) {
+        this.usedSuggestedPrice = accepted
+    }
+
+    private fun logBQ7SuggestionEvent(listingId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                BusinessAnalyticsProvider.tracker.trackListingCreated(
+                    listingId = listingId,
+                    sellerId = null,
+                    metadata = mapOf(
+                        "bq_type" to "BQ7",
+                        "price_suggestion_accepted" to usedSuggestedPrice,
+                        "suggestion_status" to if (usedSuggestedPrice) "ACCEPTED" else "IGNORED"
+                    )
                 )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                usedSuggestedPrice = false
             }
         }
     }
