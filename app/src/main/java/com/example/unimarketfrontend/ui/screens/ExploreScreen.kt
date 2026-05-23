@@ -78,7 +78,6 @@ import java.util.Locale
 import androidx.compose.ui.platform.LocalContext
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import coil.request.crossfade
 import com.example.unimarketfrontend.ui.utils.ImageUtils
 import com.example.unimarketfrontend.viewmodel.ExploreListingUiItem
 
