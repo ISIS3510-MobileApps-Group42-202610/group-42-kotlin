@@ -121,6 +121,8 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
     var usedSuggestedPrice: Boolean = false
 
     init {
+        _aiSuggestion.value = null
+        _aiErrorMessage.value = null
         loadCourses()
     }
 
