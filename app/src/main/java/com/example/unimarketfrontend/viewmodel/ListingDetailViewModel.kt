@@ -44,17 +44,6 @@ sealed class ListingDetailUiState {
 
 data class RatingSummaryUi(val average: Double, val count: Int)
 
-data class ListingDetailActionState(
-    val sellerDisplayName: String,
-    val contactTargetId: Int?,
-    val contactTargetName: String?,
-    val contactActionLabel: String,
-    val isOwner: Boolean,
-    val canMarkAsSold: Boolean,
-    val hasExternalComments: Boolean,
-    val externalCommentsCount: Int
-)
-
 class ListingDetailViewModel(
     application: Application,
     private val listingId: Int
@@ -163,29 +152,6 @@ class ListingDetailViewModel(
         val ratings = reviews.mapNotNull { it.rating?.toDouble() }
         if (ratings.isEmpty()) return RatingSummaryUi(0.0, 0)
         return RatingSummaryUi(ratings.average(), ratings.size)
-    }
-
-    private fun buildListingDetailActionState(
-        listing: Listing,
-        seller: User?,
-        buyer: User?,
-        currentUser: User?,
-        reviews: List<Review>
-    ): ListingDetailActionState {
-        val isOwner = currentUser?.id == (listing.owner_user_id ?: listing.seller_id)
-        val isBuyer = buyer?.id == currentUser?.id || listing.buyer_id == currentUser?.id
-        val sellerName = seller?.let { "${it.name} ${it.last_name}".trim() }.orEmpty().ifBlank { "Vendedor" }
-
-        return ListingDetailActionState(
-            sellerDisplayName = sellerName,
-            contactTargetId = if (isOwner) buyer?.id else seller?.id,
-            contactTargetName = if (isOwner) buyer?.let { "${it.name} ${it.last_name}".trim() } else sellerName,
-            contactActionLabel = if (isOwner) "Contactar comprador" else "Contactar vendedor",
-            isOwner = isOwner,
-            canMarkAsSold = isOwner && listing.active,
-            hasExternalComments = reviews.any { it.user_id != currentUser?.id },
-            externalCommentsCount = reviews.count { it.user_id != currentUser?.id && !it.content.isNullOrBlank() }
-        )
     }
 
     fun toggleWishlist() {
