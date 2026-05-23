@@ -50,12 +50,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import coil.compose.rememberConstraintsSizeResolver
 import com.example.unimarketfrontend.model.course.Course
 import com.example.unimarketfrontend.model.explore.ExploreSubcategory
 import com.example.unimarketfrontend.model.explore.ExploreSubcategoryType
@@ -78,6 +78,7 @@ import java.util.Locale
 import androidx.compose.ui.platform.LocalContext
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import coil.request.crossfade
 import com.example.unimarketfrontend.ui.utils.ImageUtils
 import com.example.unimarketfrontend.viewmodel.ExploreListingUiItem
 
@@ -585,12 +586,13 @@ fun ExploreThumbnailImage(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val thumbnailUrl = remember(imageUrl) { ImageUtils.getThumbnailUrl(imageUrl) }
-    val sizeResolver = rememberConstraintsSizeResolver()
-    val request = remember(thumbnailUrl, context) {
+    val thumbnailPx = remember(density) { with(density) { 64.dp.roundToPx() } }
+    val request = remember(thumbnailUrl, context, thumbnailPx) {
         ImageRequest.Builder(context)
             .data(thumbnailUrl)
-            .size(sizeResolver)
+            .size(thumbnailPx, thumbnailPx)
             .crossfade(false)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
@@ -601,7 +603,7 @@ fun ExploreThumbnailImage(
         model = request,
         contentDescription = null,
         contentScale = ContentScale.Crop,
-        modifier = modifier.then(sizeResolver)
+        modifier = modifier
     )
 }
 
