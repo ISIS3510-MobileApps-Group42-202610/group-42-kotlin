@@ -84,7 +84,7 @@ object LocationHelper {
         when {
             candidates.isEmpty() -> {
                 // Verificar si al menos estamos en el campus (radio amplio)
-                val campusCenter = CampusPoint("Campus", 4.6013, -74.0660)
+                val campusCenter = CampusPoint("Campus", 4.6040, -74.0658)
                 val distToCampus = haversine(location.latitude, location.longitude, campusCenter.lat, campusCenter.lng)
                 android.util.Log.d("LocationHelper", "Distance to campus center: ${String.format("%.1f", distToCampus)}m")
                 if (distToCampus <= 300.0) "Uniandes Campus" else null
@@ -114,7 +114,7 @@ object LocationHelper {
             getCurrentLocation(context)
         } ?: getLastLocation(context) ?: return@withContext false
 
-        val campusCenter = CampusPoint("Centro campus", 4.6013, -74.0659)
+        val campusCenter = CampusPoint("Centro campus", 4.6040, -74.0658)
         haversine(location.latitude, location.longitude, campusCenter.lat, campusCenter.lng) <= 150.0
     }
 

@@ -45,6 +45,7 @@ fun AppNavigation() {
             composable("explore") { ExploreScreen(navController) }
             composable("search") { ExploreScreen(navController) }
             composable("createListing") { CreateListingScreen(navController) }
+            composable("wishlist") { WishlistScreen(navController) }
 
             composable(
                 route = ListingRoutesFactory.DETAIL_ROUTE,
