@@ -253,12 +253,11 @@ fun ListingDetailScreen(
                             }
                         },
                         actions = {
-                            val successState = current as? ListingDetailUiState.Success
                             IconButton(onClick = { vm.toggleWishlist() }) {
                                 Icon(
-                                    imageVector = if (successState?.isWishlisted == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    imageVector = if (current.isInWishlist) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                     contentDescription = "Wishlist",
-                                    tint = if (successState?.isWishlisted == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                    tint = if (current.isInWishlist) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }

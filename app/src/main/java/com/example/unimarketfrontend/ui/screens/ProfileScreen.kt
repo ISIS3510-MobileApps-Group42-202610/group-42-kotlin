@@ -27,8 +27,8 @@ import androidx.navigation.NavController
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.user.User
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
-import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.ui.navigation.ListingRoutesFactory
+import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.viewmodel.ProfileViewModel
 import com.example.unimarketfrontend.viewmodel.PurchaseItem
 
@@ -169,7 +169,11 @@ fun ProfileScreen(
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
                             StatItem(purchases.size.toString(), "Purchases")
-                            StatItem(wishlist.size.toString(),  "Wishlist")
+                            StatItem(
+                                value = wishlist.size.toString(), 
+                                label = "Wishlist",
+                                onClick = { navController.navigate("wishlist") }
+                            )
                             StatItem(following.size.toString(), "Following")
                         }
                     }
@@ -281,8 +285,11 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun StatItem(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun StatItem(value: String, label: String, onClick: () -> Unit = {}) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
         Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
         Text(label, fontSize = 12.sp, color = TextGray)
     }
@@ -305,6 +312,7 @@ private fun WishlistItem(listing: Listing, onRemove: () -> Unit, onClick: () -> 
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardColor),
         elevation = CardDefaults.cardElevation(1.dp),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
         modifier = Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

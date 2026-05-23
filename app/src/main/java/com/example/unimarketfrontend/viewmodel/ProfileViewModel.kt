@@ -1,13 +1,17 @@
 package com.example.unimarketfrontend.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.mappers.toListing
 import com.example.unimarketfrontend.model.repository.AuthRepository
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
+import com.example.unimarketfrontend.model.repository.WishlistRepository
 import com.example.unimarketfrontend.model.user.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class PurchaseItem(
@@ -21,15 +25,16 @@ data class PurchaseItem(
     val status: String?
 )
 
-class ProfileViewModel : ViewModel() {
+class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository()
+    private val wishlistRepository = WishlistRepository(application)
     private val analyticsTracker = BusinessAnalyticsProvider.tracker
 
-    private val _user      = MutableStateFlow<User?>(null)
+    private val _user = MutableStateFlow<User?>(null)
     val user: StateFlow<User?> = _user
 
-    private val _wishlist  = MutableStateFlow<List<Listing>>(emptyList())
+    private val _wishlist = MutableStateFlow<List<Listing>>(emptyList())
     val wishlist: StateFlow<List<Listing>> = _wishlist
 
     private val _purchases = MutableStateFlow<List<PurchaseItem>>(emptyList())
@@ -41,25 +46,34 @@ class ProfileViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
-    private val _errorMsg  = MutableStateFlow<String?>(null)
+    private val _errorMsg = MutableStateFlow<String?>(null)
     val errorMsg: StateFlow<String?> = _errorMsg
 
-    init { loadProfile() }
+    init {
+        loadProfile()
+        observeWishlist()
+    }
+
+    private fun observeWishlist() {
+        viewModelScope.launch {
+            wishlistRepository.observeWishlist().collectLatest { entities ->
+                _wishlist.value = entities.map { it.toListing() }
+            }
+        }
+    }
 
     fun loadProfile() {
         viewModelScope.launch {
             _isLoading.value = true
-            _errorMsg.value  = null
+            _errorMsg.value = null
             try {
                 _user.value = authRepository.getMyProfile()
             } catch (e: Exception) {
                 _errorMsg.value = "Error getting user: ${e.message}"
             }
-            try {
-                _wishlist.value = authRepository.getWishlist()
-            } catch (e: Exception) {
 
-            }
+            launch { wishlistRepository.refreshFromNetwork() }
+
             try {
                 val response = authRepository.getPurchases()
                 _purchases.value = response.purchases.orEmpty().map { purchase ->
@@ -75,12 +89,14 @@ class ProfileViewModel : ViewModel() {
                         status = "Completed"
                     )
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
             }
+
             try {
                 _following.value = authRepository.getFollowing()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
             }
+
             _isLoading.value = false
         }
     }
@@ -88,9 +104,8 @@ class ProfileViewModel : ViewModel() {
     fun removeFromWishlist(listingId: Int) {
         viewModelScope.launch {
             try {
-                authRepository.removeFromWishlist(listingId)
                 val removedListing = _wishlist.value.firstOrNull { it.id == listingId }
-                _wishlist.value = _wishlist.value.filter { it.id != listingId }
+                wishlistRepository.removeFromWishlist(listingId)
                 trackEvent(
                     "wishlist_removed",
                     mapOf(
@@ -101,7 +116,7 @@ class ProfileViewModel : ViewModel() {
                         "source_screen" to "Profile"
                     )
                 )
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _errorMsg.value = "Error trying to delete from wishlist"
             }
         }

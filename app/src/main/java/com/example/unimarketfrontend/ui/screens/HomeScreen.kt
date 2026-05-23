@@ -1,5 +1,6 @@
 package com.example.unimarketfrontend.ui.screens
 
+import android.app.Application
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -145,8 +146,24 @@ fun HomeScreen(
                             .padding(horizontal = 16.dp, vertical = if (isLandscape) 6.dp else 12.dp)
                     ) {
                         if (!isLandscape) {
-                            Text(text = "Hello ${data.userName}", fontSize = 14.sp, color = TextSecondary)
-                            Text(text = "Unimarket", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(text = "Hello ${data.userName}", fontSize = 14.sp, color = TextSecondary)
+                                    Text(text = "Unimarket", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                }
+                                // SPRINT 4: Boton para ir a la Wishlist
+                                IconButton(onClick = { navController.navigate("wishlist") }) {
+                                    Icon(
+                                        imageVector = Icons.Default.FavoriteBorder,
+                                        contentDescription = "Wishlist",
+                                        tint = PrimaryIndigo
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.height(10.dp))
                         }
 

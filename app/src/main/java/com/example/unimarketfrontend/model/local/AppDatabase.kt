@@ -7,21 +7,20 @@ import androidx.room.RoomDatabase
 import com.example.unimarketfrontend.model.local.dao.CourseDao
 import com.example.unimarketfrontend.model.local.dao.ListingDao
 import com.example.unimarketfrontend.model.local.dao.MessagesDao
+import com.example.unimarketfrontend.model.local.dao.WishlistDao
+import com.example.unimarketfrontend.model.local.dao.PendingWishlistDao
 
-/*
- * Esta es la base de datos principal de la app usando Room.
- * Aca centralizamos todas las tablas (entities) y los puntos de acceso (DAOs).
- * Sigue el patron Singleton para no abrir multiples conexiones al archivo .db.
- */
 @Database(
     entities = [
         ListingEntity::class,
         CachedCourseEntity::class,
         ConversationEntity::class,
         PendingMessageEntity::class,
-        MessageEntity::class // SPRINT 3: Tabla para el historial bilateral de mensajes
+        MessageEntity::class,
+        WishlistEntity::class,
+        PendingWishlistEntity::class
     ],
-    version = 7, // Subimos la version por la nueva tabla CachedCourseEntity
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -29,6 +28,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun listingDao(): ListingDao
     abstract fun messagesDao(): MessagesDao
     abstract fun courseDao(): CourseDao
+    abstract fun wishlistDao(): WishlistDao
+    abstract fun pendingWishlistDao(): PendingWishlistDao
 
     companion object {
         @Volatile
@@ -41,7 +42,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "unimarket.db"
                 )
-                    .fallbackToDestructiveMigration() // Si cambiamos el esquema, borra y recrea la DB
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }
             }
