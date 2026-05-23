@@ -9,21 +9,16 @@ import com.example.unimarketfrontend.model.local.dao.MessagesDao
 import com.example.unimarketfrontend.model.local.dao.WishlistDao
 import com.example.unimarketfrontend.model.local.dao.PendingWishlistDao
 
-/*
- * Esta es la base de datos principal de la app usando Room.
- * Aca centralizamos todas las tablas (entities) y los puntos de acceso (DAOs).
- * Sigue el patron Singleton para no abrir multiples conexiones al archivo .db.
- */
 @Database(
     entities = [
         ListingEntity::class,
         ConversationEntity::class,
         PendingMessageEntity::class,
         MessageEntity::class,
-        WishlistEntity::class, // SPRINT 4: Tabla para favoritos
-        PendingWishlistEntity::class // SPRINT 4: Acciones pendientes offline
+        WishlistEntity::class,
+        PendingWishlistEntity::class
     ],
-    version = 8, // Subimos a la version 8 para incluir PendingWishlistEntity
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,7 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "unimarket.db"
                 )
-                    .fallbackToDestructiveMigration() // Si cambiamos el esquema, borra y recrea la DB
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }
             }

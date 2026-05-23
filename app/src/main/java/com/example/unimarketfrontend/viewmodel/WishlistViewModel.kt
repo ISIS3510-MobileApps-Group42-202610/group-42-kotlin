@@ -17,7 +17,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * SPRINT 4 — WishlistViewModel
+ * SPRINT 4 — WishlistViewModel (Esteban Hernandez)
+ *
  * Implementa arquitectura Offline-First y sincronización de BQ7.
  *
  * Architecture: MVVM with Repository pattern
@@ -41,8 +42,6 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing
 
-    init {
-        observeConnectivity()
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
@@ -78,13 +77,6 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun removeFromWishlist(listingId: Int) {
-        viewModelScope.launch {
-            repository.removeFromWishlist(listingId)
-            // Tracking para BQ7
-            BusinessAnalyticsProvider.tracker.trackWishlistItemRemoved(listingId)
-        }
-    }
     fun refresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
@@ -103,7 +95,8 @@ class WishlistViewModel(application: Application) : AndroidViewModel(application
                     sellerId = listing.seller_id,
                     metadata = mapOf(
                         "category" to (listing.category ?: "unknown"),
-                        "price" to listing.selling_price.toString()
+                        "price" to listing.selling_price.toString(),
+                        "source" to "wishlist_screen"
                     )
                 )
             } else {

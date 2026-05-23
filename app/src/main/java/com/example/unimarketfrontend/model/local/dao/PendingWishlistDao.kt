@@ -5,10 +5,6 @@ import androidx.room.Insert
 import androidx.room.Query
 import com.example.unimarketfrontend.model.local.PendingWishlistEntity
 
-/**
- * SPRINT 4 — DAO for offline wishlist synchronization.
- * Crucial for the "Eventual Connectivity" senior architecture.
- */
 @Dao
 interface PendingWishlistDao {
     @Insert
