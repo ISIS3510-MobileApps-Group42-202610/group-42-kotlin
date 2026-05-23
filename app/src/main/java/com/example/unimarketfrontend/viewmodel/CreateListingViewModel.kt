@@ -85,10 +85,6 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         courseDao = AppDatabase.getInstance(application).courseDao()
     )
 
-    init {
-        loadCourses()
-    }
-
     private val prefs = application.getSharedPreferences("listing_draft", Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow<CreateListingState>(CreateListingState.Idle)
@@ -123,6 +119,10 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
     val aiErrorMessage: StateFlow<String?> = _aiErrorMessage
 
     var usedSuggestedPrice: Boolean = false
+
+    init {
+        loadCourses()
+    }
 
     fun setSelectedCourse(courseId: Int?) {
         _selectedCourseId.value = courseId
