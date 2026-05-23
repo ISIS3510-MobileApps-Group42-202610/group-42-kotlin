@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.ListingImage
 import com.example.unimarketfrontend.model.listing.Purchase
+import com.example.unimarketfrontend.model.mappers.toListing
 import com.example.unimarketfrontend.model.repository.AuthRepository
 import com.example.unimarketfrontend.model.repository.WishlistRepository
 import com.example.unimarketfrontend.model.user.User
@@ -16,6 +17,7 @@ import kotlinx.coroutines.launch
 
 /**
  * SPRINT 4 — ProfileViewModel
+ * Updated to use WishlistRepository for reactive local storage (Tank Architecture).
  * Updated to use WishlistRepository for reactive local storage.
  */
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
@@ -49,6 +51,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private fun observeWishlist() {
         viewModelScope.launch {
             wishlistRepository.observeWishlist().collectLatest { entities ->
+                _wishlist.value = entities.map { it.toListing() }
                 _wishlist.value = entities.map { entity ->
                     Listing(
                         id = entity.listingId,
@@ -91,6 +94,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 _errorMsg.value = "Error getting user: ${e.message}"
             }
             
+            // Trigger a network refresh to ensure local cache is up to date
             // Background refresh to ensure cache is fresh
             launch {
                 wishlistRepository.refreshFromNetwork()
@@ -113,6 +117,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 wishlistRepository.removeFromWishlist(listingId)
+                // UI will update automatically via Flow observation
             } catch (e: Exception) {
                 _errorMsg.value = "Error trying to delete from wishlist"
             }

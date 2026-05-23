@@ -7,7 +7,6 @@ import com.example.unimarketfrontend.model.local.WishlistEntity
 
 fun Listing.toEntity(): ListingEntity {
     val primaryUrl = images?.firstOrNull { it.is_primary }?.url ?: images?.firstOrNull()?.url
-
     return ListingEntity(
         id = id,
         sellerId = seller_id,
@@ -62,6 +61,7 @@ fun ListingEntity.toListing(): Listing {
 
 fun List<ListingEntity>.toListings(): List<Listing> = map { it.toListing() }
 
+/** SPRINT 4: Mapper para convertir favoritos de Room a objetos de dominio */
 /** SPRINT 4: Mapper for Wishlist items */
 fun WishlistEntity.toListing(): Listing {
     return Listing(

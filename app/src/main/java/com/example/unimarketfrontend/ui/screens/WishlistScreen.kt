@@ -27,6 +27,7 @@ import com.example.unimarketfrontend.viewmodel.WishlistViewModel
 
 /**
  * SPRINT 4 — WishlistScreen
+ * Shows the user's saved listings with offline support (Tank Architecture).
  *
  * New view for Sprint 4 (Esteban Hernandez).
  * Shows the user's saved listings with offline support.
@@ -91,6 +92,7 @@ fun WishlistScreen(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
+            if (wishlist.isEmpty() && !isRefreshing) {
             // Error snackbar
             errorMessage?.let { msg ->
                 Snackbar(
@@ -194,6 +196,7 @@ private fun WishlistCard(
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
+                    Text(text = "UM", style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = item.title.firstOrNull()?.uppercase() ?: "?",
                         style = MaterialTheme.typography.titleLarge,
@@ -218,6 +221,17 @@ private fun WishlistCard(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
+                Text(
+                    text = "${item.category ?: "Others"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+
+            IconButton(onClick = onRemove) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = "Remove",
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     item.condition?.let {

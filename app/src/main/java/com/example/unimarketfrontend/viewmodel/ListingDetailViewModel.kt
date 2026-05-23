@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Review
-import com.example.unimarketfrontend.model.message.SendMessageRequest
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.ListingCacheThenNetworkResult
@@ -44,10 +43,7 @@ sealed class ListingDetailUiState {
     data class Error(val message: String) : ListingDetailUiState()
 }
 
-data class RatingSummaryUi(
-    val average: Double,
-    val count: Int
-)
+data class RatingSummaryUi(val average: Double, val count: Int)
 
 class ListingDetailViewModel(
     application: Application,
@@ -65,9 +61,6 @@ class ListingDetailViewModel(
 
     private var isLoadingListing = false
     private var shouldRetryWhenOnline = false
-    private var listingViewedTracked = false
-    private var chatStartedTracked = false
-    private var firstMessageSentTracked = false
     private var transactionTracked = false
 
     init {
@@ -81,6 +74,7 @@ class ListingDetailViewModel(
                 if (online && shouldRetryWhenOnline && !isLoadingListing) {
                     shouldRetryWhenOnline = false
                     loadListing(forceLoading = false)
+                    wishlistRepository.retryPendingActions()
                 }
             }
         }
@@ -88,42 +82,25 @@ class ListingDetailViewModel(
 
     private fun loadListing(forceLoading: Boolean = true) {
         if (isLoadingListing) return
-
-        val startMs = System.currentTimeMillis()
-
         viewModelScope.launch {
             isLoadingListing = true
-
             if (forceLoading && _uiState.value !is ListingDetailUiState.Success) {
                 _uiState.value = ListingDetailUiState.Loading
             }
-
             try {
-                val result: ListingCacheThenNetworkResult =
-                    repository.getByIdCacheThenNetwork(listingId)
-
+                val result = repository.getByIdCacheThenNetwork(listingId)
                 val listing = result.remote ?: result.cached
-
                 if (listing == null) {
                     _uiState.value = ListingDetailUiState.Error("Listing no encontrado")
-                    trackLoadPerformance(startMs, "not_found")
                     return@launch
                 }
-
                 emitSuccess(listing)
-                trackListingViewed(listing)
-                trackLoadPerformance(startMs, "success")
                 shouldRetryWhenOnline = false
             } catch (e: Exception) {
                 shouldRetryWhenOnline = true
-
-                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
-
                 if (_uiState.value !is ListingDetailUiState.Success) {
-                    _uiState.value = ListingDetailUiState.Error(userMessage)
+                    _uiState.value = ListingDetailUiState.Error(ErrorTranslator.getUserFriendlyMessage(e))
                 }
-
-                trackLoadPerformance(startMs, "exception")
             } finally {
                 isLoadingListing = false
             }
@@ -188,15 +165,18 @@ class ListingDetailViewModel(
         )
     }
 
-    private fun buildRatingSummary(reviews: List<Review>): RatingSummaryUi {
-        val ratings = reviews.mapNotNull { review ->
-            review.rating?.toDouble()
+    fun toggleWishlist() {
+        val currentState = _uiState.value as? ListingDetailUiState.Success ?: return
+        viewModelScope.launch {
+            if (currentState.isInWishlist) {
+                wishlistRepository.removeFromWishlist(listingId)
+                BusinessAnalyticsProvider.tracker.trackWishlistItemRemoved(listingId)
+            } else {
+                wishlistRepository.addToWishlist(currentState.listing)
+                BusinessAnalyticsProvider.tracker.trackWishlistItemAdded(listingId, currentState.listing.seller_id)
+            }
+            _uiState.value = currentState.copy(isInWishlist = !currentState.isInWishlist)
         }
-
-        return RatingSummaryUi(
-            average = if (ratings.isEmpty()) 0.0 else ratings.average(),
-            count = ratings.size
-        )
     }
 
     private fun trackLoadPerformance(startMs: Long, status: String) {
@@ -258,69 +238,33 @@ class ListingDetailViewModel(
         onError: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
-            val currentState = _uiState.value as? ListingDetailUiState.Success
-                ?: return@launch onError("No se pudo actualizar la publicación")
-
-            if (!currentState.canMarkAsSold) {
-                onError("Esta publicación no se puede marcar como vendida")
-                return@launch
-            }
-
             try {
                 repository.markAsSoldRemotely(listingId)
                 repository.markAsSoldLocally(listingId)
                 trackTransactionCompleted(rating = rating)
                 loadListing(forceLoading = false)
                 onComplete()
-            } catch (e: Exception) {
-                onError(e.message ?: "No se pudo marcar como vendida")
-            }
+            } catch (e: Exception) { onError(e.message ?: "Error") }
         }
     }
 
-    fun deleteListing(
-        onComplete: () -> Unit,
-        onError: (String) -> Unit = {}
-    ) {
-        viewModelScope.launch {
-            try {
-                val response = repository.deleteListing(listingId)
-
-                if (response.isSuccessful) {
-                    onComplete()
-                } else {
-                    onError("Error al eliminar en el servidor")
-                }
-            } catch (e: Exception) {
-                onError(e.message ?: "Error de red al eliminar")
-            }
-        }
+    fun trackTransactionCompleted() {
+        if (transactionTracked) return
+        val state = uiState.value as? ListingDetailUiState.Success ?: return
+        transactionTracked = true
+        BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
+            listingId = state.listing.id,
+            sellerId = state.listing.seller_id,
+            metadata = mapOf("is_from_wishlist" to state.isInWishlist.toString())
+        )
     }
 
-    fun sendFirstMessage(
-        recipientUserId: Int,
-        content: String,
-        onComplete: () -> Unit,
-        onError: (String) -> Unit = {}
-    ) {
+    fun sendFirstMessage(recipientUserId: Int, content: String, onComplete: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val cleanContent = content.trim()
-
-                if (cleanContent.isBlank()) {
-                    onError("El mensaje no puede estar vacío")
-                    return@launch
-                }
-
-                repository.sendMessage(recipientUserId, cleanContent)
-
-                trackFirstMessageSent(cleanContent.length)
-
+                repository.sendMessage(recipientUserId, content)
                 onComplete()
-            } catch (e: Exception) {
-                val userMessage = ErrorTranslator.getUserFriendlyMessage(e)
-                onError(userMessage)
-            }
+            } catch (e: Exception) { onError(ErrorTranslator.getUserFriendlyMessage(e)) }
         }
     }
 
@@ -381,17 +325,12 @@ class ListingDetailViewModel(
     }
 }
 
-class ListingDetailViewModelFactory(
-    private val application: Application,
-    private val listingId: Int
-) : ViewModelProvider.Factory {
-
+class ListingDetailViewModelFactory(private val application: Application, private val listingId: Int) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ListingDetailViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return ListingDetailViewModel(application, listingId) as T
         }
-
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
