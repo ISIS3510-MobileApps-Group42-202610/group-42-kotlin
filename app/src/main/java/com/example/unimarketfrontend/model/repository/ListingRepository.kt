@@ -171,16 +171,45 @@ class CourseRepository(
         }
 
         return try {
-            val remote = api.getCourses()
+            val response = api.getCourses()
+            if (!response.isSuccessful) {
+                val errorBody = try {
+                    response.errorBody()?.string()?.take(300)
+                } catch (_: Exception) {
+                    null
+                }
+                val message = buildString {
+                    append("Could not load courses from network")
+                    append(" (HTTP ${response.code()})")
+                    if (!response.message().isNullOrBlank()) {
+                        append(": ${response.message()}")
+                    }
+                    if (!errorBody.isNullOrBlank()) {
+                        append(" - $errorBody")
+                    }
+                }
+                return if (cached.isNotEmpty()) {
+                    CourseResult.Success(
+                        courses = cached.toDomainCourses(),
+                        source = DataSource.CACHE,
+                        lastUpdated = lastUpdated
+                    )
+                } else {
+                    CourseResult.Error(message)
+                }
+            }
+
+            val remote = response.body().orEmpty()
             val now = System.currentTimeMillis()
             val entities = remote.map { it.toEntity(now) }
             if (entities.isNotEmpty()) {
+                courseDao.clearCourses()
                 courseDao.upsertCourses(entities)
             }
             CourseResult.Success(
                 courses = entities.toDomainCourses(),
                 source = DataSource.NETWORK,
-                lastUpdated = courseDao.getLastUpdated()
+                lastUpdated = now
             )
         } catch (e: Exception) {
             if (cached.isNotEmpty()) {
@@ -190,7 +219,7 @@ class CourseRepository(
                     lastUpdated = lastUpdated
                 )
             } else {
-                CourseResult.Error("Could not load courses")
+                CourseResult.Error("Could not load courses from network: ${e.message}")
             }
         }
     }

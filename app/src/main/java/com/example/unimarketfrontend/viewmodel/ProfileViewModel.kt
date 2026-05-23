@@ -89,8 +89,18 @@ class ProfileViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 authRepository.removeFromWishlist(listingId)
+                val removedListing = _wishlist.value.firstOrNull { it.id == listingId }
                 _wishlist.value = _wishlist.value.filter { it.id != listingId }
-                trackEvent("wishlist_removed", mapOf("listing_id" to listingId, "source_screen" to "profile"))
+                trackEvent(
+                    "wishlist_removed",
+                    mapOf(
+                        "listing_id" to listingId.toString(),
+                        "course_id" to removedListing?.course_id?.toString(),
+                        "category" to removedListing?.category,
+                        "condition" to removedListing?.condition,
+                        "source_screen" to "Profile"
+                    )
+                )
             } catch (e: Exception) {
                 _errorMsg.value = "Error trying to delete from wishlist"
             }
@@ -98,16 +108,16 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun trackProfileWishlistViewed() {
-        trackEvent("profile_wishlist_viewed", emptyMap())
+        trackEvent("profile_wishlist_viewed", mapOf("source_screen" to "Profile"))
     }
 
     fun trackProfilePurchasesViewed() {
-        trackEvent("profile_purchases_viewed", emptyMap())
+        trackEvent("profile_purchases_viewed", mapOf("source_screen" to "Profile"))
     }
 
-    private fun trackEvent(eventName: String, metadata: Map<String, Any?>) {
+    private fun trackEvent(eventName: String, params: Map<String, String?>) {
         try {
-            analyticsTracker.trackCustomEvent(eventName = eventName, metadata = metadata)
+            analyticsTracker.trackEvent(eventName, params)
         } catch (_: Exception) {
         }
     }

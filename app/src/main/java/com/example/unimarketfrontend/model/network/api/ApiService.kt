@@ -70,7 +70,7 @@ interface ApiService {
     suspend fun getListings(): Response<List<Listing>>
 
     @GET("api/v1/courses")
-    suspend fun getCourses(): List<CourseDto>
+    suspend fun getCourses(): Response<List<CourseDto>>
 
     @GET("api/v1/listings/{id}")
     suspend fun getListingById(@Path("id") listingId: Int): Response<Listing>

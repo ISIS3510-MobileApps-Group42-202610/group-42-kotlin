@@ -68,6 +68,8 @@ fun CreateListingScreen(
     val state by viewModel.state.collectAsState()
     val courses by viewModel.courses.collectAsState()
     val selectedCourseId by viewModel.selectedCourseId.collectAsState()
+    val courseLoading by viewModel.courseLoading.collectAsState()
+    val courseLoadError by viewModel.courseLoadError.collectAsState()
     val context = LocalContext.current
 
     var title by remember { mutableStateOf("") }
@@ -391,7 +393,12 @@ fun CreateListingScreen(
             CreateListingCourseSelector(
                 selectedCourseLabel = courses.firstOrNull { it.id == selectedCourseId }?.displayLabel
                     ?: "Course (optional)",
-                onClick = { showCourseDialog = true }
+                onClick = {
+                    if (courses.isEmpty()) {
+                        viewModel.loadCourses(forceRefresh = true)
+                    }
+                    showCourseDialog = true
+                }
             )
 
             if (showCourseDialog) {
@@ -407,32 +414,77 @@ fun CreateListingScreen(
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            LazyColumn(
-                                modifier = Modifier.heightIn(max = 260.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                items(filteredCourses, key = { it.id }) { course ->
-                                    Text(
-                                        text = course.displayLabel,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                viewModel.setSelectedCourse(course.id)
-                                                showCourseDialog = false
-                                                try {
-                                                    analyticsTracker.trackCustomEvent(
-                                                        "create_listing_course_selected",
-                                                        metadata = mapOf(
-                                                            "course_id" to course.id,
-                                                            "course_code" to course.code
-                                                        )
-                                                    )
-                                                } catch (_: Exception) {
-                                                }
+                            if (courses.isEmpty()) {
+                                when {
+                                    courseLoading -> {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().height(100.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                        }
+                                    }
+                                    courseLoadError != null -> {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = courseLoadError ?: "Error loading courses",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                            TextButton(onClick = { viewModel.loadCourses(forceRefresh = true) }) {
+                                                  Text("Retry", color = MaterialTheme.colorScheme.primary)
                                             }
-                                            .padding(vertical = 6.dp),
-                                        color = TextPrimary
-                                    )
+                                        }
+                                    }
+                                    else -> {
+                                        Text(
+                                            "No courses available",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.heightIn(max = 260.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (filteredCourses.isEmpty()) {
+                                        item {
+                                            Text(
+                                                "No courses found",
+                                                modifier = Modifier.padding(8.dp),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    items(filteredCourses, key = { it.id }) { course ->
+                                        Text(
+                                            text = course.displayLabel,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    viewModel.setSelectedCourse(course.id)
+                                                    showCourseDialog = false
+                                                    try {
+                                                        analyticsTracker.trackCustomEvent(
+                                                            "create_listing_course_selected",
+                                                            metadata = mapOf(
+                                                                "course_id" to course.id.toString(),
+                                                                "course_code" to course.code
+                                                            )
+                                                        )
+                                                    } catch (_: Exception) {
+                                                    }
+                                                }
+                                                .padding(vertical = 6.dp),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
                                 }
                             }
                         }

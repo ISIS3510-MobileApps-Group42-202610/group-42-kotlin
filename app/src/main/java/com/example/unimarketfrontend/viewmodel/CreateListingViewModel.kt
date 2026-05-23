@@ -16,6 +16,7 @@ import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.repository.CourseRepository
 import com.example.unimarketfrontend.model.repository.CourseResult
 import com.example.unimarketfrontend.model.utils.ErrorTranslator
+import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -91,11 +92,31 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
     private val _courses = MutableStateFlow<List<CourseOption>>(emptyList())
     val courses: StateFlow<List<CourseOption>> = _courses
 
+    private val _courseLoading = MutableStateFlow(false)
+    val courseLoading: StateFlow<Boolean> = _courseLoading
+
+    private val _courseLoadError = MutableStateFlow<String?>(null)
+    val courseLoadError: StateFlow<String?> = _courseLoadError
+
     private val _selectedCourseId = MutableStateFlow<Int?>(null)
     val selectedCourseId: StateFlow<Int?> = _selectedCourseId
 
     fun setSelectedCourse(courseId: Int?) {
         _selectedCourseId.value = courseId
+        if (courseId != null) {
+            val course = _courses.value.find { it.id == courseId }
+            BusinessAnalyticsProvider.tracker.trackEvent(
+                eventName = "create_listing_course_selected",
+                params = mapOf(
+                    "course_id" to courseId.toString(),
+                    "course_code" to course?.code,
+                    "course_name" to course?.name,
+                    "faculty" to course?.faculty,
+                    "department_code" to course?.departmentCode,
+                    "source_screen" to "CreateListing"
+                )
+            )
+        }
     }
 
     fun saveDraft(title: String, description: String, price: String, category: String, uris: List<Uri>) {
@@ -230,6 +251,28 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
                 }
 
                 listingRepository.cacheRemoteListings(listOf(listing))
+
+                val courseId = listing.course_id ?: _selectedCourseId.value
+                val course = courseId?.let { id -> _courses.value.find { it.id == id } }
+                val fallbackCourseCode = if (courseId == null) "OTHER" else course?.code
+                val fallbackCourseName = if (courseId == null) "Other / Optional course" else course?.name
+                val fallbackDepartmentCode = if (courseId == null) "" else course?.departmentCode
+                val fallbackFaculty = if (courseId == null) null else course?.faculty
+                BusinessAnalyticsProvider.tracker.trackEvent(
+                    eventName = "listing_created",
+                    params = mapOf(
+                        "listing_id" to listing.id.toString(),
+                        "course_id" to courseId?.toString(),
+                        "course_code" to fallbackCourseCode,
+                        "course_name" to fallbackCourseName,
+                        "faculty" to fallbackFaculty,
+                        "department_code" to fallbackDepartmentCode,
+                        "category" to listing.category,
+                        "condition" to listing.condition,
+                        "source_screen" to "CreateListing"
+                    )
+                )
+
                 clearDraft()
                 _listingCreated.tryEmit(listing.id)
                 _state.value = CreateListingState.Success
@@ -374,26 +417,32 @@ class CreateListingViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    private fun loadCourses() {
+    fun loadCourses(forceRefresh: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            when (val result = courseRepository.getCourses()) {
-                is CourseResult.Success -> {
-                    val mapped = result.courses
-                        .sortedBy { it.code }
-                        .map { course ->
-                            CourseOption(
-                                id = course.id,
-                                code = course.code,
-                                name = course.name,
-                                faculty = course.faculty,
-                                departmentCode = course.departmentCode
-                            )
-                        }
-                    _courses.value = mapped
+            _courseLoading.value = true
+            try {
+                when (val result = courseRepository.getCourses(forceRefresh)) {
+                    is CourseResult.Success -> {
+                        val mapped = result.courses
+                            .sortedBy { it.code }
+                            .map { course ->
+                                CourseOption(
+                                    id = course.id,
+                                    code = course.code,
+                                    name = course.name,
+                                    faculty = course.faculty,
+                                    departmentCode = course.departmentCode
+                                )
+                            }
+                        _courses.value = mapped
+                        _courseLoadError.value = null
+                    }
+                    is CourseResult.Error -> {
+                        _courseLoadError.value = result.message
+                    }
                 }
-                is CourseResult.Error -> {
-                    _courses.value = emptyList()
-                }
+            } finally {
+                _courseLoading.value = false
             }
         }
     }

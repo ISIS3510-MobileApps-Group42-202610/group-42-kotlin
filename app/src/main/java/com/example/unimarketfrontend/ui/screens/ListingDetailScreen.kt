@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -252,11 +253,12 @@ fun ListingDetailScreen(
                             }
                         },
                         actions = {
+                            val successState = current as? ListingDetailUiState.Success
                             IconButton(onClick = { vm.toggleWishlist() }) {
                                 Icon(
-                                    imageVector = if (current.isWishlisted) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    imageVector = if (successState?.isWishlisted == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                     contentDescription = "Wishlist",
-                                    tint = if (current.isWishlisted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                    tint = if (successState?.isWishlisted == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                             }
                         }
@@ -315,10 +317,35 @@ fun ListingDetailScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listing.condition?.let { AssistChip(onClick = {}, label = { Text(it) }) }
-                        listing.category?.let { AssistChip(onClick = {}, label = { Text(it) }) }
+                        listing.condition?.let {
+                            AssistChip(
+                                onClick = {},
+                                label = { Text(it) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        }
+                        listing.category?.let {
+                            AssistChip(
+                                onClick = {},
+                                label = { Text(it) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        }
                         if (!listing.active) {
-                            AssistChip(onClick = {}, label = { Text("Vendida") })
+                            AssistChip(
+                                onClick = {},
+                                label = { Text("Vendida") },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
                         }
                     }
 

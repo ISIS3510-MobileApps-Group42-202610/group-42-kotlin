@@ -5,9 +5,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.unimarketfrontend.model.course.Course
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Review
+import com.example.unimarketfrontend.model.mappers.toDomainCourses
 import com.example.unimarketfrontend.model.message.SendMessageRequest
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
@@ -25,8 +27,8 @@ sealed class ListingDetailUiState {
     object Loading : ListingDetailUiState()
 
     data class Success(
-        val listing: Listing,
-        val seller: User?,
+        val listing: com.example.unimarketfrontend.model.listing.Listing,
+        val seller: com.example.unimarketfrontend.model.user.User?,
         val sellerDisplayName: String,
         val contactTargetId: Int?,
         val contactTargetName: String?,
@@ -36,7 +38,7 @@ sealed class ListingDetailUiState {
         val canMarkAsSold: Boolean,
         val hasExternalComments: Boolean,
         val externalCommentsCount: Int,
-        val reviews: List<Review>,
+        val reviews: List<com.example.unimarketfrontend.model.listing.Review>,
         val ratingSummary: RatingSummaryUi
     ) : ListingDetailUiState()
 
@@ -272,10 +274,23 @@ class ListingDetailViewModel(
                 }
                 
                 val eventName = if (wasWishlisted) "wishlist_removed" else "wishlist_added"
+                
+                // Old tracking
                 BusinessAnalyticsProvider.tracker.trackCustomEvent(
                     eventName = eventName,
                     listingId = listingId,
                     metadata = mapOf("source_screen" to "listing_detail")
+                )
+                
+                // New structured tracking for BQ
+                BusinessAnalyticsProvider.tracker.trackEvent(
+                    eventName = eventName,
+                    params = mapOf(
+                        "listing_id" to listingId.toString(),
+                        "category" to currentState.listing.category,
+                        "course_id" to currentState.listing.course_id?.toString(),
+                        "source_screen" to "ListingDetail"
+                    )
                 )
             } catch (e: Exception) {
                 // Revert on error

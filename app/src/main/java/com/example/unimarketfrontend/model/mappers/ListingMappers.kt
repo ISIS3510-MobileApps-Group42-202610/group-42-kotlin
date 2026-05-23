@@ -65,12 +65,13 @@ fun ListingEntity.toListing(): Listing {
 fun List<ListingEntity>.toListings(): List<Listing> = map { it.toListing() }
 
 fun CourseDto.toEntity(cachedAt: Long): CachedCourseEntity {
+    val safeCode = code ?: "UNKNOWN"
     return CachedCourseEntity(
-        id = id,
-        code = code,
-        name = name,
-        faculty = faculty,
-        departmentCode = code.substringBefore("-"),
+        id = id ?: 0,
+        code = safeCode,
+        name = name ?: "Unnamed Course",
+        faculty = faculty ?: "Other",
+        departmentCode = safeCode.substringBefore("-"),
         cachedAt = cachedAt
     )
 }

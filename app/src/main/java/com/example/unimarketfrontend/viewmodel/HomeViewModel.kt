@@ -157,10 +157,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     authRepository.addToWishlist(listingId)
                 }
+                val listing = (currentState.trending + currentState.recent).firstOrNull { it.id == listingId }
                 com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider.tracker.trackCustomEvent(
                     eventName = if (wasWishlisted) "wishlist_removed" else "wishlist_added",
                     listingId = listingId,
                     metadata = mapOf("source_screen" to "home")
+                )
+                com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider.tracker.trackEvent(
+                    eventName = if (wasWishlisted) "wishlist_removed" else "wishlist_added",
+                    params = mapOf(
+                        "listing_id" to listingId.toString(),
+                        "course_id" to listing?.course_id?.toString(),
+                        "category" to listing?.category,
+                        "condition" to listing?.condition,
+                        "source_screen" to "Home"
+                    )
                 )
             } catch (e: Exception) {
                 _uiState.value = currentState.copy(wishlistListingIds = currentState.wishlistListingIds)
