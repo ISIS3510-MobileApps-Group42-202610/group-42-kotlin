@@ -231,28 +231,6 @@ private fun WishlistCard(
             IconButton(onClick = onRemove) {
                 Icon(
                     imageVector = Icons.Default.Favorite,
-                    contentDescription = "Remove",
-                Spacer(Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    item.condition?.let {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text(it, style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                    if (!item.active) {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text("Sold", style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-            }
-
-            // Remove from wishlist button
-            IconButton(onClick = onRemove) {
-                Icon(
-                    imageVector = Icons.Default.Favorite,
                     contentDescription = "Remove from wishlist",
                     tint = MaterialTheme.colorScheme.error
                 )

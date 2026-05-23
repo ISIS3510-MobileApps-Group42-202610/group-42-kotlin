@@ -313,7 +313,6 @@ private fun WishlistItem(listing: Listing, onRemove: () -> Unit, onClick: () -> 
         colors = CardDefaults.cardColors(containerColor = CardColor),
         elevation = CardDefaults.cardElevation(1.dp),
         modifier = Modifier.fillMaxWidth().clickable { onClick() }
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
