@@ -209,6 +209,15 @@ class BusinessAnalyticsTracker(
             } catch (e: Exception) { }
         }
     }
+
+    fun trackListingCreated(
+        listingId: Int,
+        sellerId: Int?,
+        metadata: Map<String, Any?>? = null
+    ) {
+        trackEvent(BusinessEventName.LISTING_CREATED, listingId, sellerId, metadata)
+    }
+
     private fun nowIsoUtc(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")

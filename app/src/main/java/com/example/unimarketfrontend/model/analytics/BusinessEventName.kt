@@ -7,5 +7,7 @@ enum class BusinessEventName(val value: String) {
     TRANSACTION_COMPLETED("transaction_completed"),
     CAMPUS_BANNER_SHOWN("campus_banner_shown"),
     WISHLIST_ITEM_ADDED("wishlist_item_added"),
-    WISHLIST_ITEM_REMOVED("wishlist_item_removed")
+    WISHLIST_ITEM_REMOVED("wishlist_item_removed"),
+
+    LISTING_CREATED("listing_created")
 }
