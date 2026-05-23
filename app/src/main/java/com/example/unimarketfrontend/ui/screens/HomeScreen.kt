@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -243,7 +244,12 @@ fun HomeScreen(
                                 key = { it.id },
                                 contentType = { "full_card" }
                             ) { listing ->
-                                HomeFullCard(listing = listing, onClick = { navigation.navigateToListing(listing.id) })
+                                HomeFullCard(
+                                    listing = listing,
+                                    isWishlisted = data.wishlistListingIds.contains(listing.id),
+                                    onWishlistClick = { viewModel.toggleWishlist(listing.id) },
+                                    onClick = { navigation.navigateToListing(listing.id) }
+                                )
                             }
                         }
                     } else {
@@ -367,6 +373,8 @@ private fun HomeSmallCard(
 @Composable
 private fun HomeFullCard(
     listing: Listing,
+    isWishlisted: Boolean,
+    onWishlistClick: () -> Unit,
     onClick: () -> Unit
 ) {
     val displayCategory = remember(listing.category) { toDisplayCategory(listing.category) }
@@ -420,6 +428,17 @@ private fun HomeFullCard(
                 Text(text = displayCategory, fontSize = 11.sp, color = TextSecondary)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = "$${listing.selling_price}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+            }
+            IconButton(
+                onClick = onWishlistClick,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = if (isWishlisted) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = "Wishlist",
+                    tint = if (isWishlisted) PrimaryIndigo else TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

@@ -42,7 +42,8 @@ fun AppNavigation() {
             composable("profile") { ProfileScreen(navController = navController, onLogout = { isLoggedIn = false }) }
             composable("manage") { ManageProductsScreen(navController) }
             composable("messages") { MessagesScreen(navController) }
-            composable("search") { SearchScreen(navController) }
+            composable("explore") { ExploreScreen(navController) }
+            composable("search") { ExploreScreen(navController) }
             composable("createListing") { CreateListingScreen(navController) }
             composable("wishlist") { WishlistScreen(navController) }
 

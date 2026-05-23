@@ -1,5 +1,8 @@
 package com.example.unimarketfrontend.model.mappers
 
+import com.example.unimarketfrontend.model.course.Course
+import com.example.unimarketfrontend.model.course.CourseDto
+import com.example.unimarketfrontend.model.local.CachedCourseEntity
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.ListingImage
 import com.example.unimarketfrontend.model.local.ListingEntity
@@ -61,8 +64,31 @@ fun ListingEntity.toListing(): Listing {
 
 fun List<ListingEntity>.toListings(): List<Listing> = map { it.toListing() }
 
-/** SPRINT 4: Mapper para convertir favoritos de Room a objetos de dominio */
-/** SPRINT 4: Mapper for Wishlist items */
+fun CourseDto.toEntity(cachedAt: Long): CachedCourseEntity? {
+    val safeId = id ?: return null
+    val safeCode = code ?: "UNKNOWN"
+    return CachedCourseEntity(
+        id = safeId,
+        code = safeCode,
+        name = name ?: "Unnamed Course",
+        faculty = faculty ?: "Other",
+        departmentCode = safeCode.substringBefore("-"),
+        cachedAt = cachedAt
+    )
+}
+
+fun CachedCourseEntity.toDomain(): Course {
+    return Course(
+        id = id,
+        code = code,
+        name = name,
+        faculty = faculty,
+        departmentCode = departmentCode
+    )
+}
+
+fun List<CachedCourseEntity>.toDomainCourses(): List<Course> = map { it.toDomain() }
+
 fun WishlistEntity.toListing(): Listing {
     return Listing(
         id = listingId,

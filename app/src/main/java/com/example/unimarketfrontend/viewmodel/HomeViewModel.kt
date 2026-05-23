@@ -21,7 +21,8 @@ sealed class HomeUiState {
         val userName: String,
         val trending: List<Listing>,
         val recent: List<Listing>,
-        val categories: List<CategoryUi>
+        val categories: List<CategoryUi>,
+        val wishlistListingIds: Set<Int> = emptySet()
     ) : HomeUiState()
     data class Error(val message: String) : HomeUiState()
 }
@@ -36,6 +37,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val homeRepository = HomeRepository(
         listingDao = AppDatabase.getInstance(application).listingDao()
     )
+
+    private val authRepository = com.example.unimarketfrontend.model.repository.AuthRepository()
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState
@@ -98,15 +101,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val homeDataDeferred = async {
                         homeRepository.refreshHomeData()
                     }
+                    val wishlistDeferred = async {
+                        runCatching { authRepository.getWishlist() }.getOrNull()
+                    }
 
                     val userName = userDeferred.await()
                     val homeResponse = homeDataDeferred.await()
+                    val wishlist = wishlistDeferred.await()
 
                     _uiState.value = HomeUiState.Success(
                         userName = userName,
                         trending = homeResponse.trending.filter { it.active },
                         recent = homeResponse.recent.filter { it.active },
-                        categories = homeResponse.categories.map { CategoryUi(it.category, it.count) }
+                        categories = homeResponse.categories.map { CategoryUi(it.category, it.count) },
+                        wishlistListingIds = wishlist?.map { it.id }?.toSet() ?: emptySet()
                     )
                 }
                 shouldRetryWhenOnline = false
@@ -129,5 +137,45 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             .eachCount()
             .map { CategoryUi(name = it.key, count = it.value) }
             .sortedByDescending { it.count }
+    }
+
+    fun toggleWishlist(listingId: Int) {
+        val currentState = _uiState.value as? HomeUiState.Success ?: return
+        val wasWishlisted = currentState.wishlistListingIds.contains(listingId)
+        val updated = if (wasWishlisted) {
+            currentState.wishlistListingIds - listingId
+        } else {
+            currentState.wishlistListingIds + listingId
+        }
+        
+        _uiState.value = currentState.copy(wishlistListingIds = updated)
+
+        viewModelScope.launch {
+            try {
+                if (wasWishlisted) {
+                    authRepository.removeFromWishlist(listingId)
+                } else {
+                    authRepository.addToWishlist(listingId)
+                }
+                val listing = (currentState.trending + currentState.recent).firstOrNull { it.id == listingId }
+                com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider.tracker.trackCustomEvent(
+                    eventName = if (wasWishlisted) "wishlist_removed" else "wishlist_added",
+                    listingId = listingId,
+                    metadata = mapOf("source_screen" to "home")
+                )
+                com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider.tracker.trackEvent(
+                    eventName = if (wasWishlisted) "wishlist_removed" else "wishlist_added",
+                    params = mapOf(
+                        "listing_id" to listingId.toString(),
+                        "course_id" to listing?.course_id?.toString(),
+                        "category" to listing?.category,
+                        "condition" to listing?.condition,
+                        "source_screen" to "Home"
+                    )
+                )
+            } catch (e: Exception) {
+                _uiState.value = currentState.copy(wishlistListingIds = currentState.wishlistListingIds)
+            }
+        }
     }
 }

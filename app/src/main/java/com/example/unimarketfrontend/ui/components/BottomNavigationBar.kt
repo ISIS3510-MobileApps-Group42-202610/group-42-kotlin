@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -27,10 +28,10 @@ fun BottomNavigationBar(
         )
 
         NavigationBarItem(
-            icon = { Icon(Icons.Default.ShoppingCart, null) },
-            label = { Text("Manage") },
-            selected = currentRoute == "manage",
-            onClick = { onRouteChange("manage") }
+            icon = { Icon(Icons.Default.Search, null) },
+            label = { Text("Explore") },
+            selected = currentRoute == "explore",
+            onClick = { onRouteChange("explore") }
         )
 
         NavigationBarItem(
@@ -45,6 +46,13 @@ fun BottomNavigationBar(
             label = { Text("Profile") },
             selected = currentRoute == "profile",
             onClick = { onRouteChange("profile") }
+        )
+
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.ShoppingCart, null) },
+            label = { Text("Manage") },
+            selected = currentRoute == "manage",
+            onClick = { onRouteChange("manage") }
         )
     }
 }

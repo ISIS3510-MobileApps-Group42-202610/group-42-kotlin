@@ -25,19 +25,17 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.unimarketfrontend.model.listing.Listing
-import com.example.unimarketfrontend.model.listing.Purchase
 import com.example.unimarketfrontend.model.user.User
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
 import com.example.unimarketfrontend.ui.navigation.ListingRoutesFactory
 import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.viewmodel.ProfileViewModel
+import com.example.unimarketfrontend.viewmodel.PurchaseItem
 
 private val Primary   = Color(0xFF7B8FE8)
 private val BgColor   = Color(0xFFFFFFFF)
 private val CardColor = Color(0xFFF5F5F5)
 private val TextGray  = Color(0xFFC4C4C4)
-
-private enum class ProfileTab { WISHLIST, PURCHASES, FOLLOWING }
 
 @Composable
 fun ProfileScreen(
@@ -53,8 +51,12 @@ fun ProfileScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMsg  by viewModel.errorMsg.collectAsState()
 
-    var selectedTab        by remember { mutableStateOf(ProfileTab.PURCHASES) }
     var showDeleteDialog   by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.trackProfileWishlistViewed()
+        viewModel.trackProfilePurchasesViewed()
+    }
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -191,74 +193,62 @@ fun ProfileScreen(
                 }
             }
 
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TabChip(
-                        label = "Wishlist",
-                        icon = { Icon(Icons.Default.Favorite, null, modifier = Modifier.size(16.dp)) },
-                        selected = selectedTab == ProfileTab.WISHLIST,
-                        onClick = { selectedTab = ProfileTab.WISHLIST },
-                        modifier = Modifier.weight(1f)
-                    )
-                    TabChip(
-                        label = "Purchases",
-                        icon = { Icon(Icons.Default.ShoppingBag, null, modifier = Modifier.size(16.dp)) },
-                        selected = selectedTab == ProfileTab.PURCHASES,
-                        onClick = { selectedTab = ProfileTab.PURCHASES },
-                        modifier = Modifier.weight(1f)
-                    )
-                    TabChip(
-                        label = "Following",
-                        icon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)) },
-                        selected = selectedTab == ProfileTab.FOLLOWING,
-                        onClick = { selectedTab = ProfileTab.FOLLOWING },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
             if (errorMsg != null) {
                 item { Text(errorMsg!!, color = Color.Red, fontSize = 12.sp) }
             }
 
-            when (selectedTab) {
-                ProfileTab.WISHLIST -> {
-                    if (wishlist.isEmpty()) {
-                        item { EmptyState("You don't have items in your wishlist :c") }
-                    } else {
-                        items(wishlist) { listing ->
-                            WishlistItem(
-                                listing = listing, 
-                                onClick = {
-                                    navController.navigate(ListingRoutesFactory.detailPath(listing.id))
-                                },
-                                onRemove = {
-                                    viewModel.removeFromWishlist(listing.id)
-                                }
+            item {
+                SectionHeader("My Wishlist")
+            }
+
+            if (wishlist.isEmpty()) {
+                item { EmptyState("Your wishlist is empty.") }
+            } else {
+                items(wishlist, key = { it.id }) { listing ->
+                    WishlistItem(
+                        listing = listing,
+                        onRemove = { viewModel.removeFromWishlist(listing.id) },
+                        onClick = {
+                            navController.navigateTracked(
+                                targetRoute = ListingRoutesFactory.detailPath(listing.id),
+                                destinationKey = ListingRoutesFactory.DETAIL_ROUTE
                             )
                         }
-                    }
+                    )
                 }
-                ProfileTab.PURCHASES -> {
-                    if (purchases.isEmpty()) {
-                        item { EmptyState("You don't have any purchases") }
-                    } else {
-                        items(purchases) { purchase ->
-                            PurchaseItem(purchase = purchase)
+            }
+
+            item {
+                SectionHeader("My Purchases")
+            }
+
+            if (purchases.isEmpty()) {
+                item { EmptyState("You have no purchases yet.") }
+            } else {
+                items(purchases, key = { it.transactionId }) { purchase ->
+                    PurchaseCard(
+                        purchase = purchase,
+                        onClick = {
+                            if (purchase.listingId > 0) {
+                                navController.navigateTracked(
+                                    targetRoute = ListingRoutesFactory.detailPath(purchase.listingId),
+                                    destinationKey = ListingRoutesFactory.DETAIL_ROUTE
+                                )
+                            }
                         }
-                    }
+                    )
                 }
-                ProfileTab.FOLLOWING -> {
-                    if (following.isEmpty()) {
-                        item { EmptyState("You don't follow anyone") }
-                    } else {
-                        items(following) { followedUser ->
-                            FollowingItem(user = followedUser)
-                        }
-                    }
+            }
+
+            item {
+                SectionHeader("Following")
+            }
+
+            if (following.isEmpty()) {
+                item { EmptyState("You don't follow anyone") }
+            } else {
+                items(following, key = { it.id }) { followedUser ->
+                    FollowingItem(user = followedUser)
                 }
             }
 
@@ -306,45 +296,24 @@ private fun StatItem(value: String, label: String, onClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun TabChip(
-    label: String,
-    icon: @Composable () -> Unit,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bg      = if (selected) Primary else CardColor
-    val content = if (selected) Color.White else Color.Black
-
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(50),
-        color = bg,
-        modifier = modifier.height(40.dp)
-    ) {
-        Row(
-            Modifier.padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            CompositionLocalProvider(LocalContentColor provides content) {
-                icon()
-                Spacer(Modifier.width(4.dp))
-                Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = content)
-            }
-        }
-    }
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = Color.Black,
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+    )
 }
 
 @Composable
-private fun WishlistItem(listing: Listing, onClick: () -> Unit, onRemove: () -> Unit) {
+private fun WishlistItem(listing: Listing, onRemove: () -> Unit, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardColor),
         elevation = CardDefaults.cardElevation(1.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -369,12 +338,12 @@ private fun WishlistItem(listing: Listing, onClick: () -> Unit, onRemove: () -> 
 }
 
 @Composable
-private fun PurchaseItem(purchase: Purchase) {
+private fun PurchaseCard(purchase: PurchaseItem, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardColor),
         elevation = CardDefaults.cardElevation(1.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -388,20 +357,13 @@ private fun PurchaseItem(purchase: Purchase) {
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    purchase.listing?.title ?: "Item deleted!",
-                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black
-                )
-                purchase.listing?.let {
-                    Text("$${it.selling_price}", color = Primary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-                purchase.created_at?.let {
-                    Text(it.take(10), fontSize = 12.sp, color = TextGray)
-                }
+                Text(purchase.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Black)
+                Text("$${purchase.price}", color = Primary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                purchase.date?.let { Text(it.take(10), fontSize = 12.sp, color = TextGray) }
             }
             Surface(shape = RoundedCornerShape(50), color = Color(0xFF1B3A2A)) {
                 Text(
-                    "completed",
+                    purchase.status ?: "completed",
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     fontSize = 11.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium
                 )

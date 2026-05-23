@@ -1,5 +1,6 @@
 package com.example.unimarketfrontend.model.network.api
 
+import com.example.unimarketfrontend.model.analytics.AnalyticsEventRequest
 import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
 import com.example.unimarketfrontend.model.analytics.CampusLocationEventRequest
 import com.example.unimarketfrontend.model.analytics.MessagingResponseEventRequest
@@ -11,6 +12,12 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 
 interface AnalyticsApiService {
+
+    // BQ: Demand vs Supply (New endpoint)
+    @POST("analytics/events")
+    suspend fun sendEvent(
+        @Body request: AnalyticsEventRequest
+    ): Response<Unit>
 
     // BQ4 — Seller response time (endpoint correcto del backend)
     // El endpoint /events no existe. BQ4 usa MessagingResponseEvent.

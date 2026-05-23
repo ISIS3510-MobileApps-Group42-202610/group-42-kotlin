@@ -2,6 +2,8 @@ package com.example.unimarketfrontend.model.repository
 
 import android.util.Log
 import com.example.unimarketfrontend.model.utils.analytics.AnalyticsConfig
+import com.example.unimarketfrontend.model.analytics.AnalyticsEventRequest
+import com.example.unimarketfrontend.model.analytics.AnalyticsEventNormalizer
 import com.example.unimarketfrontend.model.analytics.BusinessEventName
 import com.example.unimarketfrontend.model.analytics.BusinessEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceEventRequest
@@ -22,11 +24,26 @@ import java.util.UUID
 interface BusinessAnalyticsRepository {
     suspend fun sendEvent(event: BusinessEventRequest): Result<Unit>
     suspend fun sendPerformance(event: PerformanceEventRequest): Result<Unit>
+    suspend fun sendAnalyticsEvent(event: AnalyticsEventRequest): Result<Unit>
 }
 
 class DefaultBusinessAnalyticsRepository(
     private val analyticsApiService: AnalyticsApiService = AnalyticsRetrofitInstance.api
 ) : BusinessAnalyticsRepository {
+
+    override suspend fun sendAnalyticsEvent(event: AnalyticsEventRequest): Result<Unit> {
+        return try {
+            val response = analyticsApiService.sendEvent(event)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errorBody = response.errorBody()?.string() ?: ""
+                Result.failure(IllegalStateException("HTTP ${response.code()}: ${response.message()} - $errorBody"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     override suspend fun sendEvent(event: BusinessEventRequest): Result<Unit> {
         return try {
@@ -66,6 +83,19 @@ class BusinessAnalyticsTracker(
     @Volatile
     private var cachedUserId: Int? = null
 
+    private val demandEventNames = setOf(
+        "wishlist_added",
+        "wishlist_removed",
+        "message_seller_clicked",
+        "listing_created",
+        "purchase_started",
+        "transaction_completed"
+    )
+
+    private fun isDemandEvent(eventName: String): Boolean {
+        return eventName.startsWith("explore_") || demandEventNames.contains(eventName)
+    }
+
     fun setBusinessEventEnabled(eventName: BusinessEventName, enabled: Boolean) {
         AnalyticsConfig.businessEventFlags[eventName.value] = enabled
     }
@@ -100,6 +130,51 @@ class BusinessAnalyticsTracker(
         metadata: Map<String, Any?>? = null
     ) {
         trackEvent(BusinessEventName.WISHLIST_ITEM_REMOVED, listingId, sellerId, metadata)
+    }
+
+    /**
+     * BQ: Demand vs Supply Tracker
+     * Sends structured events to the /analytics/events endpoint
+     */
+    fun trackEvent(
+        eventName: String,
+        params: Map<String, String?>
+    ) {
+        scope.launch {
+            val userId = resolveCurrentUserId()
+            val normalized = AnalyticsEventNormalizer.normalize(params)
+            val request = AnalyticsEventRequest(
+                event_name = eventName,
+                user_id = userId?.toString(),
+                listing_id = normalized.listingId,
+                course_id = normalized.courseId,
+                course_code = normalized.courseCode,
+                course_name = normalized.courseName,
+                faculty = normalized.faculty,
+                department_code = normalized.departmentCode,
+                category = normalized.category,
+                condition = normalized.condition,
+                result_count = normalized.resultCount,
+                source_screen = normalized.sourceScreen,
+                timestamp = normalized.timestamp ?: nowIsoUtc(),
+                metadata = normalized.metadata
+            )
+
+            if (isDemandEvent(eventName)) {
+                val hasCourseContext = normalized.courseId != null ||
+                    !normalized.courseCode.isNullOrBlank() ||
+                    !normalized.departmentCode.isNullOrBlank()
+                if (!hasCourseContext) {
+                    Log.w("AnalyticsTracker", "Demand event missing course context: $eventName params=$params")
+                }
+            }
+
+            Log.d("AnalyticsTracker", "BQ Analytics payload: $request")
+
+            repository.sendAnalyticsEvent(request).onFailure {
+                Log.e("AnalyticsTracker", "BQ Analytics Error ($eventName): ${it.message}", it)
+            }
+        }
     }
 
     fun trackPerformance(
@@ -187,6 +262,29 @@ class BusinessAnalyticsTracker(
                 )
                 AnalyticsRetrofitInstance.api.sendCampusEvent(request)
             } catch (e: Exception) { }
+        }
+    }
+
+    fun trackCustomEvent(
+        eventName: String,
+        listingId: Int = 0,
+        sellerId: Int? = null,
+        metadata: Map<String, Any?>? = null
+    ) {
+        scope.launch {
+            val buyerId = resolveCurrentUserId()
+            val event = BusinessEventRequest(
+                event_name = eventName,
+                listing_id = listingId,
+                buyer_user_id = buyerId,
+                seller_user_id = sellerId,
+                timestamp = nowIsoUtc(),
+                metadata = metadata,
+                client_event_id = buildClientEventId(eventName, listingId)
+            )
+            repository.sendEvent(event).onFailure {
+                Log.e("AnalyticsTracker", "Event Error ($eventName): ${it.message}", it)
+            }
         }
     }
 

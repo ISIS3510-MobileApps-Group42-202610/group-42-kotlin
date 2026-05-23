@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +50,7 @@ import com.example.unimarketfrontend.viewmodel.CreateListingViewModel
 import kotlinx.coroutines.delay
 import java.io.File
 import kotlinx.coroutines.flow.collectLatest
+import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 
 private const val MAX_IMAGES_PER_LISTING = 8
 
@@ -66,6 +68,8 @@ fun CreateListingScreen(
     val state by viewModel.state.collectAsState()
     val courses by viewModel.courses.collectAsState()
     val selectedCourseId by viewModel.selectedCourseId.collectAsState()
+    val courseLoading by viewModel.courseLoading.collectAsState()
+    val courseLoadError by viewModel.courseLoadError.collectAsState()
     val context = LocalContext.current
 
     var title by remember { mutableStateOf("") }
@@ -74,9 +78,26 @@ fun CreateListingScreen(
     var localError by remember { mutableStateOf<String?>(null) }
     var selectedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
-    val selectedCondition = remember { mutableStateOf(ListingCondition.NEW) }
-    var selectedCategory by remember { mutableStateOf("Books") }
-    var showCourseMenu by remember { mutableStateOf(false) }
+    var selectedCondition by remember { mutableStateOf(ListingCondition.NEW) }
+    var selectedCategory by remember { mutableStateOf("Textbooks") }
+    var showCourseDialog by remember { mutableStateOf(false) }
+    var courseQuery by remember { mutableStateOf("") }
+
+    val filteredCourses by remember(courses, courseQuery) {
+        derivedStateOf {
+            val query = courseQuery.trim().lowercase()
+            if (query.isBlank()) {
+                courses
+            } else {
+                courses.filter { course ->
+                    course.code.lowercase().contains(query) ||
+                        course.name.lowercase().contains(query) ||
+                        course.faculty.lowercase().contains(query) ||
+                        course.departmentCode.lowercase().contains(query)
+                }
+            }
+        }
+    }
     var showAISuggestionCard by remember { mutableStateOf(true) }
     val aiSuggestion by viewModel.aiSuggestion.collectAsState()
     val aiErrorMessage by viewModel.aiErrorMessage.collectAsState()
@@ -91,10 +112,19 @@ fun CreateListingScreen(
     val MAX_PRICE = 25000000.0
 
     val categoryMap = mapOf(
-        "Books" to ListingCategory.TEXTBOOK,
-        "Electronics" to ListingCategory.ELECTRONICS,
+        "Textbooks" to ListingCategory.TEXTBOOK,
         "Notes" to ListingCategory.NOTES,
-        "Furniture" to ListingCategory.OTHER
+        "Supplies" to ListingCategory.SUPPLIES,
+        "Electronics" to ListingCategory.ELECTRONICS,
+        "Other" to ListingCategory.OTHER
+    )
+
+    val conditionOptions = listOf(
+        "New" to ListingCondition.NEW,
+        "Like New" to ListingCondition.LIKE_NEW,
+        "Good" to ListingCondition.GOOD,
+        "Fair" to ListingCondition.FAIR,
+        "Poor" to ListingCondition.POOR
     )
 
     fun addUris(newUris: List<Uri>) {
@@ -124,6 +154,24 @@ fun CreateListingScreen(
             cameraLauncher.launch(uri)
         } else {
             localError = "Camera permission is required to take photos"
+        }
+    }
+
+    val analyticsTracker = remember { BusinessAnalyticsProvider.tracker }
+
+    LaunchedEffect(Unit) {
+        try {
+            analyticsTracker.trackCustomEvent("create_listing_screen_opened")
+        } catch (_: Exception) {
+        }
+    }
+
+    LaunchedEffect(state) {
+        if (state is CreateListingState.Success) {
+            try {
+                analyticsTracker.trackCustomEvent("listing_created")
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -160,9 +208,15 @@ fun CreateListingScreen(
         aiSuggestion?.let { suggestion ->
             description = suggestion.description
             price = suggestion.price.toInt().toString()
-            val validCategories = listOf("Books", "Notes", "Electronics", "Furniture", "Other")
-            if (validCategories.contains(suggestion.category)) {
-                selectedCategory = suggestion.category
+            val mappedCategory = when (suggestion.category.lowercase()) {
+                "books", "book", "textbooks", "textbook" -> "Textbooks"
+                "notes" -> "Notes"
+                "electronics" -> "Electronics"
+                "supplies", "furniture" -> "Supplies"
+                else -> "Other"
+            }
+            if (mappedCategory in categoryMap.keys) {
+                selectedCategory = mappedCategory
             }
             viewModel.markSuggestionAsAccepted(true)
             showAISuggestionCard = false
@@ -194,7 +248,7 @@ fun CreateListingScreen(
                         title = ""
                         description = ""
                         price = ""
-                        selectedCategory = "Books"
+                        selectedCategory = "Textbooks"
                         selectedImageUris = emptyList()
                     }
                 },
@@ -335,7 +389,7 @@ fun CreateListingScreen(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("Books", "Notes", "Electronics", "Furniture", "Other").forEach { cat ->
+                listOf("Textbooks", "Notes", "Supplies", "Electronics", "Other").forEach { cat ->
                     Box(
                         modifier = Modifier
                             .height(40.dp)
@@ -343,6 +397,13 @@ fun CreateListingScreen(
                             .background(if (selectedCategory == cat) PrimaryIndigo else Color(0xFFDDF3F0), RoundedCornerShape(12.dp))
                             .clickable(enabled = !isLoading) {
                                 selectedCategory = cat
+                                try {
+                                    analyticsTracker.trackCustomEvent(
+                                        "create_listing_category_selected",
+                                        metadata = mapOf("category" to cat)
+                                    )
+                                } catch (_: Exception) {
+                                }
                                 viewModel.markSuggestionAsAccepted(false)
                             }
                             .padding(horizontal = 18.dp),
@@ -352,6 +413,21 @@ fun CreateListingScreen(
                     }
                 }
             }
+
+            CreateListingConditionSelector(
+                conditionOptions = conditionOptions,
+                selectedCondition = selectedCondition,
+                onConditionSelected = { condition ->
+                    selectedCondition = condition
+                    try {
+                        analyticsTracker.trackCustomEvent(
+                            "create_listing_condition_selected",
+                            metadata = mapOf("condition" to condition.value)
+                        )
+                    } catch (_: Exception) {
+                    }
+                }
+            )
 
             Box(
                 modifier = Modifier
@@ -396,45 +472,117 @@ fun CreateListingScreen(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp)
-                    .shadow(
-                        elevation = 4.dp,
-                        shape = RoundedCornerShape(12.dp),
-                        ambientColor = Color.Black.copy(alpha = 0.08f)
-                    )
-                    .background(Color.White, RoundedCornerShape(12.dp))
-                    .clickable { showCourseMenu = true }
-                    .padding(horizontal = 14.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                val courseLabel = courses.firstOrNull { it.id == selectedCourseId }?.name
-                    ?: "Curso (opcional)"
-                Text(text = courseLabel, color = TextPrimary)
-
-                DropdownMenu(
-                    expanded = showCourseMenu,
-                    onDismissRequest = { showCourseMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Sin curso") },
-                        onClick = {
-                            viewModel.setSelectedCourse(null)
-                            showCourseMenu = false
-                        }
-                    )
-                    courses.forEach { course ->
-                        DropdownMenuItem(
-                            text = { Text(course.name) },
-                            onClick = {
-                                viewModel.setSelectedCourse(course.id)
-                                showCourseMenu = false
-                            }
-                        )
+            CreateListingCourseSelector(
+                selectedCourseLabel = courses.firstOrNull { it.id == selectedCourseId }?.displayLabel
+                    ?: "Course (optional)",
+                onClick = {
+                    if (courses.isEmpty()) {
+                        viewModel.loadCourses(forceRefresh = true)
                     }
+                    showCourseDialog = true
                 }
+            )
+
+            if (showCourseDialog) {
+                AlertDialog(
+                    onDismissRequest = { showCourseDialog = false },
+                    title = { Text("Select course") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = courseQuery,
+                                onValueChange = { courseQuery = it },
+                                label = { Text("Search by code, name or faculty") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (courses.isEmpty()) {
+                                when {
+                                    courseLoading -> {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().height(100.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                        }
+                                    }
+                                    courseLoadError != null -> {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = courseLoadError ?: "Error loading courses",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                            TextButton(onClick = { viewModel.loadCourses(forceRefresh = true) }) {
+                                                  Text("Retry", color = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                    }
+                                    else -> {
+                                        Text(
+                                            "No courses available",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.heightIn(max = 260.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (filteredCourses.isEmpty()) {
+                                        item {
+                                            Text(
+                                                "No courses found",
+                                                modifier = Modifier.padding(8.dp),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    items(filteredCourses, key = { it.id }) { course ->
+                                        Text(
+                                            text = course.displayLabel,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    viewModel.setSelectedCourse(course.id)
+                                                    showCourseDialog = false
+                                                    try {
+                                                        analyticsTracker.trackCustomEvent(
+                                                            "create_listing_course_selected",
+                                                            metadata = mapOf(
+                                                                "course_id" to course.id.toString(),
+                                                                "course_code" to course.code
+                                                            )
+                                                        )
+                                                    } catch (_: Exception) {
+                                                    }
+                                                }
+                                                .padding(vertical = 6.dp),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.setSelectedCourse(null)
+                                showCourseDialog = false
+                            }
+                        ) { Text("Clear") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showCourseDialog = false }) { Text("Close") }
+                    }
+                )
             }
 
             AccentButton(
@@ -452,7 +600,8 @@ fun CreateListingScreen(
                                 title = title.trim(),
                                 product = description.ifBlank { null },
                                 category = categoryMap[selectedCategory]?.value,
-                                condition = selectedCondition.value.value,
+                                condition = selectedCondition.value,
+
                                 original_price = null,
                                 selling_price = p,
                                 course_id = selectedCourseId
@@ -543,5 +692,51 @@ fun CreateListingScreen(
             }
         }
         Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+private fun CreateListingConditionSelector(
+    conditionOptions: List<Pair<String, com.example.unimarketfrontend.model.listing.ListingCondition>>,
+    selectedCondition: com.example.unimarketfrontend.model.listing.ListingCondition,
+    onConditionSelected: (com.example.unimarketfrontend.model.listing.ListingCondition) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Condition", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            conditionOptions.forEach { (label, condition) ->
+                FilterChip(
+                    selected = selectedCondition == condition,
+                    onClick = { onConditionSelected(condition) },
+                    label = { Text(label) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateListingCourseSelector(
+    selectedCourseLabel: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(12.dp),
+                ambientColor = Color.Black.copy(alpha = 0.08f)
+            )
+            .background(Color.White, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(text = selectedCourseLabel, color = TextPrimary)
     }
 }

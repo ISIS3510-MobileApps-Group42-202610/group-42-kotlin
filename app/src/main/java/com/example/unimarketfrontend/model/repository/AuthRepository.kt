@@ -26,5 +26,6 @@ class AuthRepository {
     suspend fun getFollowing(): List<User> = api.getFollowing()
     suspend fun removeFromWishlist(listingId: Int) = api.removeFromWishlist(listingId)
     suspend fun deleteAccount(userId: Int): Response<Unit> = api.deleteAccount(userId)
+    suspend fun addToWishlist(listingId: Int) = api.addToWishlist(listingId)
 }
 

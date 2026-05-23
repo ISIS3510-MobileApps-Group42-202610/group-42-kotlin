@@ -3,6 +3,7 @@ package com.example.unimarketfrontend.model.network.api
 import com.example.unimarketfrontend.model.auth.ForgotPasswordRequest
 import com.example.unimarketfrontend.model.auth.RegisterRequest
 import com.example.unimarketfrontend.model.auth.ResetPasswordRequest
+import com.example.unimarketfrontend.model.course.CourseDto
 import com.example.unimarketfrontend.model.listing.AddImageRequest
 import com.example.unimarketfrontend.model.listing.CreateListingRequest
 import com.example.unimarketfrontend.model.listing.HomeResponseDto
@@ -67,6 +68,9 @@ interface ApiService {
     // Listings
     @GET("api/v1/listings")
     suspend fun getListings(): Response<List<Listing>>
+
+    @GET("api/v1/courses")
+    suspend fun getCourses(): Response<List<CourseDto>>
 
     @GET("api/v1/listings/{id}")
     suspend fun getListingById(@Path("id") listingId: Int): Response<Listing>
