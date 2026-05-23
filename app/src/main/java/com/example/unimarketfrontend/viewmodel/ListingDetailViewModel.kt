@@ -50,7 +50,10 @@ class ListingDetailViewModel(
     private val listingId: Int
 ) : AndroidViewModel(application) {
 
-    private val repository = ListingRepository(listingDao = AppDatabase.getInstance(application).listingDao())
+    private val repository = ListingRepository(
+        listingDao = AppDatabase.getInstance(application).listingDao()
+    )
+    
     private val wishlistRepository = WishlistRepository(application)
 
     private val _uiState = MutableStateFlow<ListingDetailUiState>(ListingDetailUiState.Loading)
@@ -106,21 +109,58 @@ class ListingDetailViewModel(
 
     private suspend fun emitSuccess(listing: Listing) {
         val sellerUserId = listing.owner_user_id ?: listing.seller_id
-        val seller = runCatching { RetrofitInstance.api.getUserById(sellerUserId).body() }.getOrNull()
-        val buyer = listing.buyer_id?.let { runCatching { RetrofitInstance.api.getUserById(it).body() }.getOrNull() }
-        val currentUser = runCatching { repository.getMe() }.getOrNull()
-        val reviews = runCatching { repository.getReviews(listing.id).body() }.getOrNull().orEmpty()
-        val isInWishlist = wishlistRepository.isInWishlist(listing.id)
+
+        val seller = runCatching {
+            repository.getSellerInfo(sellerUserId)
+        }.getOrNull()
+            ?.takeIf { it.isSuccessful }
+            ?.body()
+            ?: runCatching {
+                RetrofitInstance.api.getUserById(sellerUserId).body()
+            }.getOrNull()
+
+        val buyer = listing.buyer_id?.let { buyerId ->
+            runCatching {
+                RetrofitInstance.api.getUserById(buyerId).body()
+            }.getOrNull()
+        }
+
+        val currentUser = runCatching {
+            repository.getMe()
+        }.getOrNull()
+
+        val reviews = runCatching {
+            repository.getReviews(listing.id)
+        }.getOrNull()
+            ?.takeIf { it.isSuccessful }
+            ?.body()
+            .orEmpty()
+
+        val ratingSummary = buildRatingSummary(reviews)
+
+        val actionState = buildListingDetailActionState(
+            listing = listing,
+            seller = seller,
+            buyer = buyer,
+            currentUser = currentUser,
+            reviews = reviews
+        )
         
-        val actionState = buildListingDetailActionState(listing, seller, buyer, currentUser, reviews)
+        val isInWishlist = wishlistRepository.isInWishlist(listing.id)
 
         _uiState.value = ListingDetailUiState.Success(
-            listing = listing, seller = seller, sellerDisplayName = actionState.sellerDisplayName,
-            contactTargetId = actionState.contactTargetId, contactTargetName = actionState.contactTargetName,
-            contactActionLabel = actionState.contactActionLabel, isOwner = actionState.isOwner,
-            canMarkAsSold = actionState.canMarkAsSold, hasExternalComments = actionState.hasExternalComments,
-            externalCommentsCount = actionState.externalCommentsCount, reviews = reviews,
-            ratingSummary = RatingSummaryUi(if (reviews.isEmpty()) 0.0 else reviews.mapNotNull { it.rating?.toDouble() }.average(), reviews.size),
+            listing = listing,
+            seller = seller,
+            sellerDisplayName = actionState.sellerDisplayName,
+            contactTargetId = actionState.contactTargetId,
+            contactTargetName = actionState.contactTargetName,
+            contactActionLabel = actionState.contactActionLabel,
+            isOwner = actionState.isOwner,
+            canMarkAsSold = actionState.canMarkAsSold,
+            hasExternalComments = actionState.hasExternalComments,
+            externalCommentsCount = actionState.externalCommentsCount,
+            reviews = reviews,
+            ratingSummary = ratingSummary,
             isInWishlist = isInWishlist
         )
     }
@@ -139,12 +179,70 @@ class ListingDetailViewModel(
         }
     }
 
-    fun markAsSold(onComplete: () -> Unit, onError: (String) -> Unit) {
+    private fun trackLoadPerformance(startMs: Long, status: String) {
+        BusinessAnalyticsProvider.tracker.trackPerformance(
+            metricName = "listing_detail_load_time",
+            valueMs = System.currentTimeMillis() - startMs,
+            listingId = listingId,
+            screenName = "ListingDetailScreen",
+            metadata = mapOf("status" to status)
+        )
+    }
+
+    private fun trackListingViewed(listing: Listing) {
+        if (listingViewedTracked) return
+
+        listingViewedTracked = true
+
+        BusinessAnalyticsProvider.tracker.trackListingViewed(
+            listingId = listing.id,
+            sellerId = listing.seller_id,
+            metadata = mapOf("source" to "listing_detail_screen")
+        )
+    }
+
+    fun trackChatStarted() {
+        if (chatStartedTracked) return
+
+        val listing = (uiState.value as? ListingDetailUiState.Success)?.listing ?: return
+
+        chatStartedTracked = true
+
+        BusinessAnalyticsProvider.tracker.trackChatStarted(
+            listingId = listing.id,
+            sellerId = listing.seller_id,
+            metadata = mapOf("entrypoint" to "contact_seller_button")
+        )
+    }
+
+    fun trackFirstMessageSent(messageLength: Int) {
+        if (firstMessageSentTracked) return
+
+        val listing = (uiState.value as? ListingDetailUiState.Success)?.listing ?: return
+
+        firstMessageSentTracked = true
+
+        BusinessAnalyticsProvider.tracker.trackFirstMessageSent(
+            listingId = listing.id,
+            sellerId = listing.seller_id,
+            metadata = mapOf(
+                "entrypoint" to "detail_screen",
+                "message_length" to messageLength.toString()
+            )
+        )
+    }
+
+    fun markAsSold(
+        rating: Int,
+        onComplete: () -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
             try {
                 repository.markAsSoldRemotely(listingId)
                 repository.markAsSoldLocally(listingId)
-                trackTransactionCompleted()
+                trackTransactionCompleted(rating = rating)
+                loadListing(forceLoading = false)
                 onComplete()
             } catch (e: Exception) { onError(e.message ?: "Error") }
         }
@@ -169,10 +267,61 @@ class ListingDetailViewModel(
             } catch (e: Exception) { onError(ErrorTranslator.getUserFriendlyMessage(e)) }
         }
     }
+
+    fun trackTransactionCompleted(
+        rating: Int? = null,
+        responseTimeMinutes: Int? = null
+    ) {
+        if (transactionTracked) return
+        transactionTracked = true
+
+        val state = uiState.value as? ListingDetailUiState.Success ?: return
+        val listing = state.listing
+        val seller = state.seller
+
+        val resolvedRating = rating ?: 0
+
+        BusinessAnalyticsProvider.tracker.trackTransactionCompleted(
+            listingId = listing.id,
+            sellerId = listing.seller_id,
+            metadata = mapOf(
+                "entrypoint" to "detail_screen",
+                "category" to (listing.category ?: "unknown"),
+                "product" to (listing.product ?: "unknown"),
+                "selling_price" to listing.selling_price.toString(),
+                "semester" to (seller?.semester?.toString() ?: "unknown"),
+                "seller_id" to listing.seller_id.toString(),
+                "rating" to resolvedRating.toString(),
+                "response_time_minutes" to (responseTimeMinutes ?: 0).toString(),
+                "is_from_wishlist" to state.isInWishlist.toString() // SPRINT 4 BQ7
+            )
+        )
+    }
     
-    fun trackChatStarted() {
-        val listing = (uiState.value as? ListingDetailUiState.Success)?.listing ?: return
-        BusinessAnalyticsProvider.tracker.trackChatStarted(listing.id, listing.seller_id)
+    fun toggleWishlist() {
+        val currentState = _uiState.value as? ListingDetailUiState.Success ?: return
+        viewModelScope.launch {
+            if (currentState.isInWishlist) {
+                wishlistRepository.removeFromWishlist(listingId)
+                BusinessAnalyticsProvider.tracker.trackWishlistItemRemoved(
+                    listingId = listingId,
+                    sellerId = currentState.listing.seller_id,
+                    metadata = mapOf("source" to "listing_detail")
+                )
+            } else {
+                wishlistRepository.addToWishlist(currentState.listing)
+                BusinessAnalyticsProvider.tracker.trackWishlistItemAdded(
+                    listingId = listingId,
+                    sellerId = currentState.listing.seller_id,
+                    metadata = mapOf(
+                        "category" to (currentState.listing.category ?: "unknown"),
+                        "price" to currentState.listing.selling_price.toString()
+                    )
+                )
+            }
+            // Update state locally
+            _uiState.value = currentState.copy(isInWishlist = !currentState.isInWishlist)
+        }
     }
 }
 

@@ -86,12 +86,20 @@ class BusinessAnalyticsTracker(
         trackEvent(BusinessEventName.TRANSACTION_COMPLETED, listingId, sellerId, metadata)
     }
 
-    fun trackWishlistItemAdded(listingId: Int, sellerId: Int?, metadata: Map<String, Any?>? = null) {
+    fun trackWishlistItemAdded(
+        listingId: Int,
+        sellerId: Int?,
+        metadata: Map<String, Any?>? = null
+    ) {
         trackEvent(BusinessEventName.WISHLIST_ITEM_ADDED, listingId, sellerId, metadata)
     }
 
-    fun trackWishlistItemRemoved(listingId: Int, metadata: Map<String, Any?>? = null) {
-        trackEvent(BusinessEventName.WISHLIST_ITEM_REMOVED, listingId, null, metadata)
+    fun trackWishlistItemRemoved(
+        listingId: Int,
+        sellerId: Int? = null,
+        metadata: Map<String, Any?>? = null
+    ) {
+        trackEvent(BusinessEventName.WISHLIST_ITEM_REMOVED, listingId, sellerId, metadata)
     }
 
     fun trackPerformance(

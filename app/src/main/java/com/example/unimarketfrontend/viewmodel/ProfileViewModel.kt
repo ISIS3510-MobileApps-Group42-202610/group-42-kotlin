@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.model.listing.Listing
+import com.example.unimarketfrontend.model.listing.ListingImage
 import com.example.unimarketfrontend.model.listing.Purchase
 import com.example.unimarketfrontend.model.mappers.toListing
 import com.example.unimarketfrontend.model.repository.AuthRepository
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 /**
  * SPRINT 4 — ProfileViewModel
  * Updated to use WishlistRepository for reactive local storage (Tank Architecture).
+ * Updated to use WishlistRepository for reactive local storage.
  */
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -50,6 +52,34 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             wishlistRepository.observeWishlist().collectLatest { entities ->
                 _wishlist.value = entities.map { it.toListing() }
+                _wishlist.value = entities.map { entity ->
+                    Listing(
+                        id = entity.listingId,
+                        seller_id = entity.sellerId,
+                        owner_user_id = null,
+                        buyer_id = null,
+                        course_id = null,
+                        title = entity.title,
+                        product = null,
+                        category = entity.category,
+                        condition = entity.condition,
+                        original_price = null,
+                        selling_price = entity.sellingPrice,
+                        created_at = "",
+                        updated_at = "",
+                        active = entity.active,
+                        images = if (entity.imageUrl != null) listOf(
+                            ListingImage(
+                                id = 0,
+                                listing_id = entity.listingId,
+                                is_primary = true,
+                                uploaded_at = "",
+                                url = entity.imageUrl
+                            )
+                        ) else emptyList(),
+                        priceHistory = null
+                    )
+                }
             }
         }
     }
@@ -65,6 +95,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             }
             
             // Trigger a network refresh to ensure local cache is up to date
+            // Background refresh to ensure cache is fresh
             launch {
                 wishlistRepository.refreshFromNetwork()
             }

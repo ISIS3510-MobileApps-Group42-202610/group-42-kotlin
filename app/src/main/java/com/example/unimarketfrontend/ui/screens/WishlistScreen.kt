@@ -28,6 +28,18 @@ import com.example.unimarketfrontend.viewmodel.WishlistViewModel
 /**
  * SPRINT 4 — WishlistScreen
  * Shows the user's saved listings with offline support (Tank Architecture).
+ *
+ * New view for Sprint 4 (Esteban Hernandez).
+ * Shows the user's saved listings with offline support.
+ *
+ * Eventual Connectivity:
+ * - Shows cached wishlist when offline (no blank screen)
+ * - Displays offline banner when no connectivity
+ * - Refreshes from network when online
+ *
+ * Caching: Cache-then-network via WishlistViewModel + WishlistRepository
+ * Local Storage: Room (WishlistEntity)
+ * Multi-threading: StateFlow + coroutines
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +50,7 @@ fun WishlistScreen(
     val wishlist by viewModel.wishlist.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val isOffline by viewModel.isOffline.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadWishlist()
@@ -60,6 +73,7 @@ fun WishlistScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // Offline banner — avoids Non-Informative Message antipattern
             if (isOffline) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -79,6 +93,22 @@ fun WishlistScreen(
             }
 
             if (wishlist.isEmpty() && !isRefreshing) {
+            // Error snackbar
+            errorMessage?.let { msg ->
+                Snackbar(
+                    modifier = Modifier.padding(8.dp),
+                    action = {
+                        TextButton(onClick = { viewModel.clearError() }) {
+                            Text("Dismiss")
+                        }
+                    }
+                ) {
+                    Text(msg)
+                }
+            }
+
+            if (wishlist.isEmpty() && !isRefreshing) {
+                // Empty state
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -94,6 +124,11 @@ fun WishlistScreen(
                         Text(
                             text = "No saved listings yet",
                             style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Text(
+                            text = "Tap the heart icon on any listing to save it",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
@@ -142,6 +177,7 @@ private fun WishlistCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Listing image
             if (!item.imageUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = item.imageUrl,
@@ -161,6 +197,11 @@ private fun WishlistCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = "UM", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = item.title.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -173,6 +214,7 @@ private fun WishlistCard(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2
                 )
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text = "$${item.sellingPrice}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -190,6 +232,28 @@ private fun WishlistCard(
                 Icon(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = "Remove",
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    item.condition?.let {
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(it, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                    if (!item.active) {
+                        AssistChip(
+                            onClick = {},
+                            label = { Text("Sold", style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+            }
+
+            // Remove from wishlist button
+            IconButton(onClick = onRemove) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = "Remove from wishlist",
                     tint = MaterialTheme.colorScheme.error
                 )
             }

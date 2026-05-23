@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
@@ -219,8 +221,18 @@ fun ListingDetailScreen(
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                vm.trackTransactionCompleted(rating = selectedRating)
                                 showRatingDialog = false
+                                val ratingSnapshot = selectedRating
+                                vm.markAsSold(
+                                    rating = ratingSnapshot,
+                                    onComplete = {
+                                        actionError = null
+                                        navController.popBackStack()
+                                    },
+                                    onError = { error ->
+                                        actionError = error
+                                    }
+                                )
                             }
                         ) { Text("Finalizar") }
                     },
@@ -237,6 +249,16 @@ fun ListingDetailScreen(
                         navigationIcon = {
                             IconButton(onClick = { navController.popBackStack() }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        actions = {
+                            // SPRINT 4: Boton de favoritos
+                            IconButton(onClick = { vm.toggleWishlist() }) {
+                                Icon(
+                                    imageVector = if (current.isInWishlist) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = "Wishlist",
+                                    tint = if (current.isInWishlist) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         }
                     )
@@ -377,15 +399,8 @@ fun ListingDetailScreen(
                     if (current.canMarkAsSold) {
                         Button(
                             onClick = {
-                                vm.markAsSold(
-                                    onComplete = {
-                                        actionError = null
-                                        navController.popBackStack()
-                                    },
-                                    onError = { error ->
-                                        actionError = error
-                                    }
-                                )
+                                selectedRating = 5
+                                showRatingDialog = true
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {

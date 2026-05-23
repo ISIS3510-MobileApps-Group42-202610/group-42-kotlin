@@ -19,4 +19,7 @@ interface PendingWishlistDao {
 
     @Query("DELETE FROM pending_wishlist_actions WHERE id = :id")
     suspend fun deleteById(id: Int)
+
+    @Query("DELETE FROM pending_wishlist_actions WHERE listingId = :listingId AND action = :action")
+    suspend fun deleteByListingAndAction(listingId: Int, action: String)
 }

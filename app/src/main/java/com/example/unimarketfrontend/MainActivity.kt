@@ -12,16 +12,15 @@ import com.example.unimarketfrontend.ui.theme.UniMarketFrontendTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // --- SPRINT 3: CONECTIVIDAD EVENTUAL ---
+        // Encendemos el monitor de red una sola vez usando el contexto de la aplicación
+        ConnectivityMonitor.start(applicationContext)
+
         val startupStartElapsedMs = runCatching {
             Process.getStartElapsedRealtime()
         }.getOrDefault(SystemClock.elapsedRealtime())
-
-        super.onCreate(savedInstanceState)
-        
-        // --- SPRINT 3: CONECTIVIDAD EVENTUAL ---
-        // Encendemos el monitor de red apenas abre la app. 
-        // Esto permite que toda la app sepa si hay internet desde el segundo 1.
-        ConnectivityMonitor.start(applicationContext)
 
         enableEdgeToEdge()
         setContent {
@@ -32,5 +31,10 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        ConnectivityMonitor.stop(applicationContext)
     }
 }

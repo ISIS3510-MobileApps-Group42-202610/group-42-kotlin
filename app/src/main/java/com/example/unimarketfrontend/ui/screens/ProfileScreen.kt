@@ -1,6 +1,7 @@
 package com.example.unimarketfrontend.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -27,6 +28,7 @@ import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.Purchase
 import com.example.unimarketfrontend.model.user.User
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
+import com.example.unimarketfrontend.ui.navigation.ListingRoutesFactory
 import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.viewmodel.ProfileViewModel
 
@@ -165,7 +167,11 @@ fun ProfileScreen(
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
                             StatItem(purchases.size.toString(), "Purchases")
-                            StatItem(wishlist.size.toString(),  "Wishlist")
+                            StatItem(
+                                value = wishlist.size.toString(), 
+                                label = "Wishlist",
+                                onClick = { navController.navigate("wishlist") }
+                            )
                             StatItem(following.size.toString(), "Following")
                         }
                     }
@@ -224,9 +230,15 @@ fun ProfileScreen(
                         item { EmptyState("You don't have items in your wishlist :c") }
                     } else {
                         items(wishlist) { listing ->
-                            WishlistItem(listing = listing, onRemove = {
-                                viewModel.removeFromWishlist(listing.id)
-                            })
+                            WishlistItem(
+                                listing = listing, 
+                                onClick = {
+                                    navController.navigate(ListingRoutesFactory.detailPath(listing.id))
+                                },
+                                onRemove = {
+                                    viewModel.removeFromWishlist(listing.id)
+                                }
+                            )
                         }
                     }
                 }
@@ -283,8 +295,11 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun StatItem(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun StatItem(value: String, label: String, onClick: () -> Unit = {}) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
         Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
         Text(label, fontSize = 12.sp, color = TextGray)
     }
@@ -322,12 +337,14 @@ private fun TabChip(
 }
 
 @Composable
-private fun WishlistItem(listing: Listing, onRemove: () -> Unit) {
+private fun WishlistItem(listing: Listing, onClick: () -> Unit, onRemove: () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardColor),
         elevation = CardDefaults.cardElevation(1.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(

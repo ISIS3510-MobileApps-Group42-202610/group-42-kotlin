@@ -62,6 +62,7 @@ fun ListingEntity.toListing(): Listing {
 fun List<ListingEntity>.toListings(): List<Listing> = map { it.toListing() }
 
 /** SPRINT 4: Mapper para convertir favoritos de Room a objetos de dominio */
+/** SPRINT 4: Mapper for Wishlist items */
 fun WishlistEntity.toListing(): Listing {
     return Listing(
         id = listingId,

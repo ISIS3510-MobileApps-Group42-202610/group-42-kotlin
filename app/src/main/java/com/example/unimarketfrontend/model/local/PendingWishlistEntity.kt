@@ -5,6 +5,7 @@ import androidx.room.PrimaryKey
 
 /**
  * SPRINT 4 — Entity to store pending wishlist actions when offline.
+ * This follows the "Eventual Connectivity" pattern for senior architecture.
  */
 @Entity(tableName = "pending_wishlist_actions")
 data class PendingWishlistEntity(

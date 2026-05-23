@@ -44,6 +44,7 @@ fun AppNavigation() {
             composable("messages") { MessagesScreen(navController) }
             composable("search") { SearchScreen(navController) }
             composable("createListing") { CreateListingScreen(navController) }
+            composable("wishlist") { WishlistScreen(navController) }
 
             composable(
                 route = ListingRoutesFactory.DETAIL_ROUTE,

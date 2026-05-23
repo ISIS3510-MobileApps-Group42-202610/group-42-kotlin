@@ -23,7 +23,7 @@ import com.example.unimarketfrontend.model.local.dao.PendingWishlistDao
         WishlistEntity::class, // SPRINT 4: Tabla para favoritos
         PendingWishlistEntity::class // SPRINT 4: Acciones pendientes offline
     ],
-    version = 8, // Subimos a la version 8 para incluir Wishlist y acciones pendientes
+    version = 8, // Subimos a la version 8 para incluir PendingWishlistEntity
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
