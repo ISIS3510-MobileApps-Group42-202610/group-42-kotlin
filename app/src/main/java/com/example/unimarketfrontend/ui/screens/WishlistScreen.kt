@@ -92,7 +92,6 @@ fun WishlistScreen(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
-            if (wishlist.isEmpty() && !isRefreshing) {
             // Error snackbar
             errorMessage?.let { msg ->
                 Snackbar(
