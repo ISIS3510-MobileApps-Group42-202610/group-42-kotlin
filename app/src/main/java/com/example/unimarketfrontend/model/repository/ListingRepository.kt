@@ -2,6 +2,7 @@ package com.example.unimarketfrontend.model.repository
 
 import com.example.unimarketfrontend.model.local.dao.ListingDao
 import com.example.unimarketfrontend.model.mappers.toEntities
+import com.example.unimarketfrontend.model.mappers.toEntity
 import com.example.unimarketfrontend.model.mappers.toListing
 import com.example.unimarketfrontend.model.network.api.ApiService
 import com.example.unimarketfrontend.model.network.client.RetrofitInstance
