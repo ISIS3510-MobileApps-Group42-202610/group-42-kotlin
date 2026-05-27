@@ -2,6 +2,8 @@ package com.example.unimarketfrontend.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +34,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -54,6 +55,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -462,10 +464,18 @@ private fun ExploreResultsPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                                shape = CircleShape
+                            )
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Text(
@@ -488,9 +498,6 @@ private fun ExploreResultsPanel(
                 TextButton(onClick = onBack) { Text("Categories") }
                 TextButton(onClick = onOpenCourseFilters) { Text("Course") }
                 TextButton(onClick = onOpenFilters) { Text("Filters") }
-                if (isOnline) {
-                    OutlinedButton(onClick = onRetry) { Text("Refresh latest") }
-                }
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -531,6 +538,25 @@ private fun ExploreResultsPanel(
                     }
                     else -> {
                         LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(isOnline) {
+                                    var totalDrag = 0f
+                                    detectVerticalDragGestures(
+                                        onVerticalDrag = { _, dragAmount ->
+                                            totalDrag += dragAmount
+                                        },
+                                        onDragEnd = {
+                                            if (isOnline && totalDrag < -180f) {
+                                                onRetry()
+                                            }
+                                            totalDrag = 0f
+                                        },
+                                        onDragCancel = {
+                                            totalDrag = 0f
+                                        }
+                                    )
+                                },
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(bottom = 16.dp)
                         ) {
