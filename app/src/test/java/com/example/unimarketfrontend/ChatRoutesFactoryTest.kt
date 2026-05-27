@@ -9,14 +9,17 @@ import java.nio.charset.StandardCharsets
 class ChatRoutesFactoryTest {
     @Test
     fun chatPath_encodesNamesSafely() {
-        val originalName = "Juan Pérez / Campus"
-        val path = ChatRoutesFactory.chatPath(15, originalName)
+        val originalName = "Juan Perez / Campus"
+        val path = ChatRoutesFactory.chatPath(15, originalName, iAmBuyer = true)
 
         assertEquals("chat/15/", path.substring(0, 8))
-        val encodedName = path.substringAfterLast('/')
+
+        val segments = path.split('/')
+        val encodedName = segments[2]
         val decodedName = URLDecoder.decode(encodedName, StandardCharsets.UTF_8.name())
+        val role = segments[3]
 
         assertEquals(originalName, decodedName)
+        assertEquals("1", role)
     }
 }
-

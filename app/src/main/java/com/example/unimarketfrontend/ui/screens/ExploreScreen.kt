@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -57,21 +58,23 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.unimarketfrontend.model.course.Course
+import com.example.unimarketfrontend.model.explore.ExploreFilterSection
+import com.example.unimarketfrontend.model.explore.ExploreMode
+import com.example.unimarketfrontend.model.explore.ExploreSort
 import com.example.unimarketfrontend.model.explore.ExploreSubcategory
 import com.example.unimarketfrontend.model.explore.ExploreSubcategoryType
+import com.example.unimarketfrontend.model.explore.ExploreUiState
 import com.example.unimarketfrontend.model.listing.ListingCategory
 import com.example.unimarketfrontend.model.listing.ListingCondition
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.DataSource
 import com.example.unimarketfrontend.ui.components.BottomNavigationBar
+import com.example.unimarketfrontend.ui.components.OfflineBanner
 import com.example.unimarketfrontend.ui.navigation.ListingRoutesFactory
 import com.example.unimarketfrontend.ui.navigation.navigateTracked
 import com.example.unimarketfrontend.ui.theme.BackgroundLight
 import com.example.unimarketfrontend.ui.theme.TextPrimary
-import com.example.unimarketfrontend.viewmodel.ExploreFilterSection
-import com.example.unimarketfrontend.viewmodel.ExploreMode
-import com.example.unimarketfrontend.viewmodel.ExploreSort
-import com.example.unimarketfrontend.viewmodel.ExploreUiState
+import com.example.unimarketfrontend.model.utils.ConnectivityMonitor
 import com.example.unimarketfrontend.viewmodel.ExploreViewModel
 import java.util.Locale
 
@@ -88,6 +91,7 @@ fun ExploreScreen(
     viewModel: ExploreViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val isOnline by ConnectivityMonitor.isOnline.collectAsState()
     val analyticsTracker = remember { BusinessAnalyticsProvider.tracker }
 
     LaunchedEffect(Unit) {
@@ -119,57 +123,66 @@ fun ExploreScreen(
                 .background(BackgroundLight)
                 .padding(12.dp)
         ) {
-            if (state.mode == ExploreMode.CATEGORIES) {
-                CategoryBrowser(
-                    state = state,
-                    onCategorySelected = viewModel::onCategorySelected,
-                    onSubcategorySelected = viewModel::onSubcategorySelected,
-                    onFacultySelected = viewModel::onFacultySelected,
-                    onDepartmentSelected = viewModel::onDepartmentCodeSelected,
-                    onCourseSelected = { course ->
-                        viewModel.onCourseSelected(course)
-                        viewModel.openResultsForSubcategory(state.selectedSubcategory)
-                    }
-                )
-            } else {
-                ExploreResultsPanel(
-                    state = state,
-                    onListingClick = { item ->
-                        try {
-                            analyticsTracker.trackCustomEvent(
-                                "explore_listing_opened",
-                                listingId = item.id,
-                                metadata = mapOf(
-                                    "category" to item.category,
-                                    "course_id" to item.courseId,
-                                    "course_code" to item.courseCode
-                                )
-                            )
-
-                            analyticsTracker.trackEvent(
-                                "explore_listing_opened",
-                                mapOf(
-                                    "listing_id" to item.id.toString(),
-                                    "course_id" to item.courseId?.toString(),
-                                    "course_code" to item.courseCode,
-                                    "category" to item.category,
-                                    "condition" to item.condition,
-                                    "source_screen" to "Explore"
-                                )
-                            )
-                        } catch (_: Exception) {
-                        }
-                        navController.navigateTracked(
-                            targetRoute = ListingRoutesFactory.detailPath(item.id),
-                            destinationKey = ListingRoutesFactory.DETAIL_ROUTE
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (!isOnline) {
+                    OfflineBanner("No internet connection. You are viewing saved Explore data. Reconnect to see the most recent listings.")
+                    Spacer(Modifier.height(8.dp))
+                }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (state.mode == ExploreMode.CATEGORIES) {
+                        CategoryBrowser(
+                            state = state,
+                            onCategorySelected = viewModel::onCategorySelected,
+                            onSubcategorySelected = viewModel::onSubcategorySelected,
+                            onFacultySelected = viewModel::onFacultySelected,
+                            onDepartmentSelected = viewModel::onDepartmentCodeSelected,
+                            onCourseSelected = { course ->
+                                viewModel.onCourseSelected(course)
+                                viewModel.openResultsForSubcategory(state.selectedSubcategory)
+                            }
                         )
-                    },
-                    onBack = viewModel::backToCategories,
-                    onOpenFilters = { viewModel.openFilterOverlay() },
-                    onOpenCourseFilters = { viewModel.openFilterOverlay(ExploreFilterSection.COURSE) },
-                    onRetry = viewModel::loadExploreData,
-                    onWishlistToggle = viewModel::toggleWishlist
-                )
+                    } else {
+                        ExploreResultsPanel(
+                            state = state,
+                            isOnline = isOnline,
+                            onListingClick = { item ->
+                                try {
+                                    analyticsTracker.trackCustomEvent(
+                                        "explore_listing_opened",
+                                        listingId = item.id,
+                                        metadata = mapOf(
+                                            "category" to item.category,
+                                            "course_id" to item.courseId,
+                                            "course_code" to item.courseCode
+                                        )
+                                    )
+
+                                    analyticsTracker.trackEvent(
+                                        "explore_listing_opened",
+                                        mapOf(
+                                            "listing_id" to item.id.toString(),
+                                            "course_id" to item.courseId?.toString(),
+                                            "course_code" to item.courseCode,
+                                            "category" to item.category,
+                                            "condition" to item.condition,
+                                            "source_screen" to "Explore"
+                                        )
+                                    )
+                                } catch (_: Exception) {
+                                }
+                                navController.navigateTracked(
+                                    targetRoute = ListingRoutesFactory.detailPath(item.id),
+                                    destinationKey = ListingRoutesFactory.DETAIL_ROUTE
+                                )
+                            },
+                            onBack = viewModel::backToCategories,
+                            onOpenFilters = { viewModel.openFilterOverlay() },
+                            onOpenCourseFilters = { viewModel.openFilterOverlay(ExploreFilterSection.COURSE) },
+                            onRetry = viewModel::loadExploreData,
+                            onWishlistToggle = viewModel::toggleWishlist
+                        )
+                    }
+                }
             }
 
             if (state.isFilterOverlayOpen) {
@@ -433,6 +446,7 @@ private fun AcademicSubcategoryPanel(
 @Composable
 private fun ExploreResultsPanel(
     state: ExploreUiState,
+    isOnline: Boolean,
     onListingClick: (ExploreListingUiItem) -> Unit,
     onBack: () -> Unit,
     onOpenFilters: () -> Unit,
@@ -474,6 +488,9 @@ private fun ExploreResultsPanel(
                 TextButton(onClick = onBack) { Text("Categories") }
                 TextButton(onClick = onOpenCourseFilters) { Text("Course") }
                 TextButton(onClick = onOpenFilters) { Text("Filters") }
+                if (isOnline) {
+                    OutlinedButton(onClick = onRetry) { Text("Refresh latest") }
+                }
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -488,7 +505,15 @@ private fun ExploreResultsPanel(
                         ) {
                             Text(state.errorMessage)
                             Spacer(Modifier.height(8.dp))
-                            Button(onClick = onRetry) { Text("Retry") }
+                            if (isOnline) {
+                                Button(onClick = onRetry) { Text("Retry") }
+                            } else {
+                                Text(
+                                    "Reconnect to load the latest Explore data.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
                         }
                     }
                     state.filteredListings.isEmpty() -> {
@@ -517,7 +542,9 @@ private fun ExploreResultsPanel(
                                 CompactExploreListingCard(
                                     item = item,
                                     isWishlisted = state.wishlistListingIds.contains(item.id),
-                                    onWishlistClick = { onWishlistToggle(item.id) },
+                                    onWishlistClick = {
+                                        if (isOnline) onWishlistToggle(item.id)
+                                    },
                                     onClick = { onListingClick(item) }
                                 )
                             }

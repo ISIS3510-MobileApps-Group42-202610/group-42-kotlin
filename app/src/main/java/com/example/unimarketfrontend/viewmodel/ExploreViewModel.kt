@@ -2,35 +2,31 @@ package com.example.unimarketfrontend.viewmodel
 
 import android.app.Application
 import android.os.Trace
+import android.util.LruCache
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unimarketfrontend.BuildConfig
 import com.example.unimarketfrontend.model.course.Course
-import com.example.unimarketfrontend.model.course.coursesFor
-import com.example.unimarketfrontend.model.course.departmentCodesForFaculty
-import com.example.unimarketfrontend.model.course.faculties
-import com.example.unimarketfrontend.model.course.matchesCourseSearch
+import com.example.unimarketfrontend.model.explore.ExploreFilterSection
+import com.example.unimarketfrontend.model.explore.ExploreFilters
+import com.example.unimarketfrontend.model.explore.ExploreMode
+import com.example.unimarketfrontend.model.explore.ExploreSort
 import com.example.unimarketfrontend.model.explore.ExploreSubcategory
 import com.example.unimarketfrontend.model.explore.ExploreSubcategoryType
+import com.example.unimarketfrontend.model.explore.ExploreUiState
 import com.example.unimarketfrontend.model.listing.Listing
 import com.example.unimarketfrontend.model.listing.ListingCategory
 import com.example.unimarketfrontend.model.listing.ListingCondition
-import com.example.unimarketfrontend.model.listing.matchesAcademicDepartment
-import com.example.unimarketfrontend.model.listing.matchesCategory
-import com.example.unimarketfrontend.model.listing.matchesCondition
-import com.example.unimarketfrontend.model.listing.matchesCourse
-import com.example.unimarketfrontend.model.listing.matchesFaculty
-import com.example.unimarketfrontend.model.listing.matchesPriceRange
-import com.example.unimarketfrontend.model.listing.matchesSearchQuery
-import com.example.unimarketfrontend.model.listing.matchesVirtualSubcategory
 import com.example.unimarketfrontend.model.local.AppDatabase
 import com.example.unimarketfrontend.model.repository.CourseRepository
 import com.example.unimarketfrontend.model.repository.CourseResult
-import com.example.unimarketfrontend.model.repository.DataSource
+import com.example.unimarketfrontend.model.repository.ExploreRepository
 import com.example.unimarketfrontend.model.repository.ListingRepository
 import com.example.unimarketfrontend.model.repository.BusinessAnalyticsProvider
 import com.example.unimarketfrontend.model.repository.AuthRepository
+import com.example.unimarketfrontend.viewmodel.explore.ExploreCourseDeriver
+import com.example.unimarketfrontend.viewmodel.explore.ExploreFilterEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,66 +36,6 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-enum class ExploreMode {
-    CATEGORIES,
-    RESULTS
-}
-
-enum class ExploreSort {
-    RECENT,
-    LOWEST_PRICE,
-    HIGHEST_PRICE
-}
-
-enum class ExploreFilterSection {
-    FEATURED,
-    CATEGORIES,
-    FACULTY,
-    ACADEMIC_AREA,
-    COURSE,
-    CONDITION,
-    PRICE,
-    SORT_BY
-}
-
-data class ExploreFilters(
-    val category: ListingCategory? = null,
-    val faculty: String? = null,
-    val departmentCode: String? = null,
-    val course: Course? = null,
-    val minPrice: String = "",
-    val maxPrice: String = "",
-    val condition: ListingCondition? = null,
-    val sort: ExploreSort = ExploreSort.RECENT,
-    val searchQuery: String = "",
-    val courseSearchQuery: String = ""
-)
-
-data class ExploreUiState(
-    val mode: ExploreMode = ExploreMode.CATEGORIES,
-    val isLoading: Boolean = false,
-    val filteredListings: List<ExploreListingUiItem> = emptyList(),
-    val courses: List<Course> = emptyList(),
-    val coursesById: Map<Int, Course> = emptyMap(),
-    val availableFaculties: List<String> = emptyList(),
-    val availableDepartmentCodes: List<String> = emptyList(),
-    val availableCourses: List<Course> = emptyList(),
-    val departmentsByFaculty: Map<String, List<String>> = emptyMap(),
-    val coursesByDepartment: Map<String, List<Course>> = emptyMap(),
-    val appliedFilters: ExploreFilters = ExploreFilters(),
-    val draftFilters: ExploreFilters = ExploreFilters(),
-    val selectedSubcategoryId: String? = null,
-    val selectedSubcategoryLabel: String? = null,
-    val selectedSubcategory: ExploreSubcategory? = null,
-    val wishlistListingIds: Set<Int> = emptySet(),
-    val isFilterOverlayOpen: Boolean = false,
-    val selectedFilterSection: ExploreFilterSection = ExploreFilterSection.FEATURED,
-    val resultCount: Int = 0,
-    val courseDataSource: DataSource? = null,
-    val coursesLastUpdated: Long? = null,
-    val errorMessage: String? = null
-)
 
 class ExploreViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -112,13 +48,18 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     )
 
     private val analyticsTracker = BusinessAnalyticsProvider.tracker
-    private val authRepository = AuthRepository()
+    private val exploreRepository = ExploreRepository(
+        listingRepository = listingRepository,
+        courseRepository = courseRepository,
+        authRepository = AuthRepository()
+    )
 
     private val _uiState = MutableStateFlow(ExploreUiState(isLoading = true))
     val uiState: StateFlow<ExploreUiState> = _uiState
 
     private var allListingsCache: List<Listing> = emptyList()
     private var lastEmptySignature: String? = null
+    private val filterResultsMemoryCache = LruCache<String, List<ExploreListingUiItem>>(FILTER_CACHE_MAX_ENTRIES)
 
     private val searchQueryFlow = MutableStateFlow("")
     private val courseSearchQueryFlow = MutableStateFlow("")
@@ -165,17 +106,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 Trace.beginSection("Explore_loadExploreData")
             }
             try {
-                val listings = withContext(Dispatchers.IO) {
-                    runCatching { listingRepository.syncSearchListings() }
-                        .getOrElse { listingRepository.getCachedActiveListings() }
-                }
-
-                val coursesResult = withContext(Dispatchers.IO) { courseRepository.getCourses() }
-
-                val wishlistIds = withContext(Dispatchers.IO) {
-                    runCatching { authRepository.getWishlist().map { it.id }.toSet() }
-                        .getOrDefault(emptySet())
-                }
+                val payload = withContext(Dispatchers.IO) { exploreRepository.loadExplorePayload() }
+                val listings = payload.listings
+                val coursesResult = payload.coursesResult
+                val wishlistIds = payload.wishlistIds
 
                 val (courses, dataSource, lastUpdated) = when (coursesResult) {
                     is CourseResult.Success -> Triple(coursesResult.courses, coursesResult.source, coursesResult.lastUpdated)
@@ -183,6 +117,7 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 allListingsCache = listings
+                filterResultsMemoryCache.evictAll()
 
                 val baseState = _uiState.value.copy(
                     isLoading = false,
@@ -499,39 +434,27 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     fun applyFilters() {
         val snapshot = _uiState.value
         val listingsSnapshot = allListingsCache
+        val cacheKey = buildFilterCacheKey(snapshot, listingsSnapshot.size)
         viewModelScope.launch {
             if (BuildConfig.DEBUG) {
                 Trace.beginSection("Explore_applyFilters")
             }
             val startMs = if (BuildConfig.DEBUG) System.currentTimeMillis() else 0L
             try {
-                val filteredItems = withContext(Dispatchers.Default) {
-                    val filtered = filterListings(
+                val cached = synchronized(filterResultsMemoryCache) {
+                    filterResultsMemoryCache.get(cacheKey)
+                }
+                val filteredItems = cached ?: withContext(Dispatchers.Default) {
+                    ExploreFilterEngine.buildResults(
                         listings = listingsSnapshot,
                         courses = snapshot.courses,
+                        coursesById = snapshot.coursesById,
                         filters = snapshot.appliedFilters,
                         subcategory = snapshot.selectedSubcategory
-                    )
-
-                    val sortedListings = when (snapshot.appliedFilters.sort) {
-                        ExploreSort.RECENT -> filtered.sortedByDescending { it.created_at }
-                        ExploreSort.LOWEST_PRICE -> filtered.sortedBy { it.selling_price }
-                        ExploreSort.HIGHEST_PRICE -> filtered.sortedByDescending { it.selling_price }
-                    }
-
-                    sortedListings.map { listing ->
-                        val course = listing.course_id?.let { snapshot.coursesById[it] }
-                        ExploreListingUiItem(
-                            id = listing.id,
-                            title = listing.title,
-                            price = listing.selling_price,
-                            imageUrl = listing.images?.firstOrNull()?.url,
-                            category = listing.category,
-                            condition = listing.condition,
-                            courseId = listing.course_id,
-                            courseCode = course?.code,
-                            sellerName = null
-                        )
+                    ).also { computed ->
+                        synchronized(filterResultsMemoryCache) {
+                            filterResultsMemoryCache.put(cacheKey, computed)
+                        }
                     }
                 }
 
@@ -586,25 +509,6 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun filterListings(
-        listings: List<Listing>,
-        courses: List<Course>,
-        filters: ExploreFilters,
-        subcategory: ExploreSubcategory?
-    ): List<Listing> {
-        return listings
-            .asSequence()
-            .filter { it.matchesCategory(filters.category) }
-            .filter { it.matchesFaculty(filters.faculty, courses) }
-            .filter { it.matchesAcademicDepartment(filters.departmentCode, courses) }
-            .filter { it.matchesCourse(filters.course, courses) }
-            .filter { it.matchesVirtualSubcategory(subcategory, courses) }
-            .filter { it.matchesPriceRange(filters.minPrice, filters.maxPrice) }
-            .filter { it.matchesCondition(filters.condition) }
-            .filter { it.matchesSearchQuery(filters.searchQuery, courses) }
-            .toList()
-    }
-
     fun toggleWishlist(listingId: Int) {
         val snapshot = _uiState.value
         val wasWishlisted = snapshot.wishlistListingIds.contains(listingId)
@@ -627,11 +531,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             }
             try {
                 val result = runCatching {
-                    if (wasWishlisted) {
-                        authRepository.removeFromWishlist(listingId)
-                    } else {
-                        authRepository.addToWishlist(listingId)
-                    }
+                    exploreRepository.setWishlistStatus(
+                        listingId = listingId,
+                        shouldBeWishlisted = !wasWishlisted
+                    )
                 }
 
                 if (result.isFailure) {
@@ -647,7 +550,8 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
                     }
                 } else {
                     val eventName = if (wasWishlisted) "wishlist_removed" else "wishlist_added"
-                    val listing = allListingsCache.firstOrNull { it.id == listingId }
+                    val listing = exploreRepository.getListingFromMemory(listingId)
+                        ?: allListingsCache.firstOrNull { it.id == listingId }
                     val course = listing?.course_id?.let { id -> snapshot.coursesById[id] }
                     trackEvent(
                         eventName,
@@ -678,92 +582,19 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         }
         val startMs = if (BuildConfig.DEBUG) System.currentTimeMillis() else 0L
 
-        val draft = state.draftFilters
-        
-        // 1. Ensure maps and base lists are ready
-        val faculties = if (state.availableFaculties.isEmpty()) {
-            state.courses.faculties()
-        } else {
-            state.availableFaculties
-        }
-        
-        val deptsByFaculty = if (state.departmentsByFaculty.isEmpty() && state.courses.isNotEmpty()) {
-            state.courses.groupBy({ it.faculty }, { it.departmentCode })
-                .mapValues { it.value.distinct().sorted() }
-        } else {
-            state.departmentsByFaculty
-        }
-
-        val coursesByDept = if (state.coursesByDepartment.isEmpty() && state.courses.isNotEmpty()) {
-            state.courses.groupBy { it.departmentCode }
-        } else {
-            state.coursesByDepartment
-        }
-
-        val coursesById = if (state.coursesById.isEmpty() && state.courses.isNotEmpty()) {
-            state.courses.associateBy { it.id }
-        } else {
-            state.coursesById
-        }
-
-        // 2. Derive current selection state
-        val facultyValid = draft.faculty == null || faculties.contains(draft.faculty)
-        val selectedFaculty = if (facultyValid) draft.faculty else null
-
-        val departmentCodes = if (selectedFaculty != null) {
-            deptsByFaculty[selectedFaculty] ?: emptyList()
-        } else {
-            // If no faculty selected, show all department codes
-            deptsByFaculty.values.flatten().distinct().sorted()
-        }
-        
-        val deptValid = draft.departmentCode == null || departmentCodes.contains(draft.departmentCode)
-        val selectedDepartment = if (deptValid) draft.departmentCode else null
-
-        val availableCourses = if (selectedDepartment != null) {
-            val baseList = coursesByDept[selectedDepartment] ?: emptyList()
-            if (draft.courseSearchQuery.isNotBlank()) {
-                baseList.filter { it.matchesCourseSearch(draft.courseSearchQuery) }
-            } else {
-                baseList
-            }
-        } else if (selectedFaculty != null) {
-            // Courses for all departments in this faculty
-            val deptCodes = deptsByFaculty[selectedFaculty] ?: emptyList()
-            val baseList = deptCodes.flatMap { coursesByDept[it] ?: emptyList() }
-            if (draft.courseSearchQuery.isNotBlank()) {
-                baseList.filter { it.matchesCourseSearch(draft.courseSearchQuery) }
-            } else {
-                baseList
-            }
-        } else if (draft.courseSearchQuery.isNotBlank()) {
-            state.courses.filter { it.matchesCourseSearch(draft.courseSearchQuery) }
-        } else {
-            emptyList()
-        }
-
-        val sortedAvailableCourses = availableCourses.sortedBy { it.code }
-
-        val selectedCourse = if (draft.course != null && sortedAvailableCourses.none { it.id == draft.course.id }) {
-            null
-        } else {
-            draft.course
-        }
-
-        val updatedDraft = draft.copy(
-            faculty = selectedFaculty,
-            departmentCode = selectedDepartment,
-            course = selectedCourse
+        val derived = ExploreCourseDeriver.derive(
+            courses = state.courses,
+            draft = state.draftFilters
         )
 
         val updatedState = state.copy(
-            draftFilters = updatedDraft,
-            availableFaculties = faculties,
-            availableDepartmentCodes = departmentCodes,
-            availableCourses = sortedAvailableCourses,
-            departmentsByFaculty = deptsByFaculty,
-            coursesByDepartment = coursesByDept,
-            coursesById = coursesById
+            draftFilters = derived.draftFilters,
+            availableFaculties = derived.availableFaculties,
+            availableDepartmentCodes = derived.availableDepartmentCodes,
+            availableCourses = derived.availableCourses,
+            departmentsByFaculty = derived.departmentsByFaculty,
+            coursesByDepartment = derived.coursesByDepartment,
+            coursesById = derived.coursesById
         )
 
         if (BuildConfig.DEBUG) {
@@ -852,6 +683,23 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
         return params
     }
 
+    private fun buildFilterCacheKey(state: ExploreUiState, listingCount: Int): String {
+        val f = state.appliedFilters
+        return listOf(
+            listingCount.toString(),
+            f.category?.value.orEmpty(),
+            f.faculty.orEmpty(),
+            f.departmentCode.orEmpty(),
+            f.course?.id?.toString().orEmpty(),
+            f.minPrice,
+            f.maxPrice,
+            f.condition?.value.orEmpty(),
+            f.sort.name,
+            f.searchQuery,
+            state.selectedSubcategory?.id.orEmpty()
+        ).joinToString("|")
+    }
+
     private fun trackEvent(eventName: String, metadata: Map<String, String?>) {
         val stateSnapshot = _uiState.value
         viewModelScope.launch(Dispatchers.IO) {
@@ -866,5 +714,9 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             } catch (_: Exception) {
             }
         }
+    }
+
+    companion object {
+        private const val FILTER_CACHE_MAX_ENTRIES = 40
     }
 }
