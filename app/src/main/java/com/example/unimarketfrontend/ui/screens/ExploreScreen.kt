@@ -587,7 +587,7 @@ fun ExploreThumbnailImage(
     val context = LocalContext.current
     val density = LocalDensity.current
     val thumbnailUrl = remember(imageUrl) { ImageUtils.getThumbnailUrl(imageUrl) }
-    val thumbnailPx = remember(density) { with(density) { 64.dp.roundToPx() } }
+    val thumbnailPx = remember(density) { with(density) { 48.dp.roundToPx() } }
     val request = remember(thumbnailUrl, context, thumbnailPx) {
         ImageRequest.Builder(context)
             .data(thumbnailUrl)

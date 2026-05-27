@@ -1,5 +1,6 @@
 package com.example.unimarketfrontend.model.repository
 
+import android.util.LruCache
 import com.example.unimarketfrontend.model.local.dao.ListingDao
 import com.example.unimarketfrontend.model.mappers.toEntities
 import com.example.unimarketfrontend.model.mappers.toListing
@@ -12,6 +13,35 @@ class HomeRepository(
     private val api: ApiService = RetrofitInstance.api,
     private val listingDao: ListingDao
 ) {
+    private val listingMemoryCache = LruCache<Int, Listing>(MEMORY_CACHE_MAX_LISTINGS)
+    private var memoryCacheUpdatedAtMs: Long = 0L
+
+    private fun isMemoryCacheValid(nowMs: Long = System.currentTimeMillis()): Boolean {
+        return memoryCacheUpdatedAtMs > 0L && nowMs - memoryCacheUpdatedAtMs <= MEMORY_CACHE_TTL_MS
+    }
+
+    private fun clearMemoryCache() {
+        listingMemoryCache.evictAll()
+        memoryCacheUpdatedAtMs = 0L
+    }
+
+    private fun cacheListings(listings: List<Listing>) {
+        if (listings.isEmpty()) return
+        synchronized(listingMemoryCache) {
+            listings.forEach { listingMemoryCache.put(it.id, it) }
+            memoryCacheUpdatedAtMs = System.currentTimeMillis()
+        }
+    }
+
+    private fun getMemoryListings(): List<Listing> {
+        if (!isMemoryCacheValid()) {
+            clearMemoryCache()
+            return emptyList()
+        }
+        synchronized(listingMemoryCache) {
+            return listingMemoryCache.snapshot().values.toList()
+        }
+    }
 
     private suspend fun preserveLocalInactiveState(remoteListing: Listing): Listing {
         val cached = listingDao.getById(remoteListing.id)
@@ -23,7 +53,12 @@ class HomeRepository(
     }
 
     suspend fun getCachedActiveListings(): List<Listing> {
-        return listingDao.getActive().map { it.toListing() }
+        val memoryListings = getMemoryListings().filter { it.active }
+        if (memoryListings.isNotEmpty()) return memoryListings
+
+        val localListings = listingDao.getActive().map { it.toListing() }
+        cacheListings(localListings)
+        return localListings
     }
 
     suspend fun refreshHomeData(): HomeResponseDto {
@@ -33,11 +68,17 @@ class HomeRepository(
 
         if (mergedListings.isNotEmpty()) {
             listingDao.upsertAll(mergedListings.toEntities())
+            cacheListings(mergedListings)
         }
 
         return remote.copy(
             trending = remote.trending.map { preserveLocalInactiveState(it) },
             recent = remote.recent.map { preserveLocalInactiveState(it) }
         )
+    }
+
+    private companion object {
+        private const val MEMORY_CACHE_MAX_LISTINGS = 120
+        private const val MEMORY_CACHE_TTL_MS = 5 * 60 * 1000L
     }
 }
