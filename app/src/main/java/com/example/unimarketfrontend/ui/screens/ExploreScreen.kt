@@ -1,6 +1,7 @@
 package com.example.unimarketfrontend.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.shape.CircleShape
@@ -467,15 +468,22 @@ private fun ExploreResultsPanel(
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier
+                            .size(30.dp)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                                shape = CircleShape
+                            )
                             .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                                 shape = CircleShape
                             )
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                     Text(
