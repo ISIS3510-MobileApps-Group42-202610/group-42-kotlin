@@ -59,7 +59,13 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
 
     private var allListingsCache: List<Listing> = emptyList()
     private var lastEmptySignature: String? = null
-    private val filterResultsMemoryCache = LruCache<String, List<ExploreListingUiItem>>(FILTER_CACHE_MAX_ENTRIES)
+    private val filterResultsMemoryCache =
+        object : LruCache<String, List<ExploreListingUiItem>>(dynamicFilterCacheMaxUnits()) {
+            override fun sizeOf(key: String, value: List<ExploreListingUiItem>): Int {
+                // Cada entrada pesa según cantidad de items filtrados.
+                return value.size.coerceAtLeast(1)
+            }
+        }
 
     private val searchQueryFlow = MutableStateFlow("")
     private val courseSearchQueryFlow = MutableStateFlow("")
@@ -717,6 +723,10 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     }
 
     companion object {
-        private const val FILTER_CACHE_MAX_ENTRIES = 40
+        private fun dynamicFilterCacheMaxUnits(): Int {
+            val maxMemoryMb = (Runtime.getRuntime().maxMemory() / (1024 * 1024)).toInt()
+            val derived = maxMemoryMb * 6
+            return derived.coerceIn(120, 1200)
+        }
     }
 }

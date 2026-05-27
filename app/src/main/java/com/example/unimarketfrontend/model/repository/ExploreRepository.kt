@@ -19,7 +19,7 @@ class ExploreRepository(
 ) {
     private var payloadMemoryCache: ExplorePayload? = null
     private var payloadCachedAtMs: Long = 0L
-    private val listingByIdMemoryCache = LruCache<Int, Listing>(MAX_LISTING_CACHE_SIZE)
+    private val listingByIdMemoryCache = LruCache<Int, Listing>(dynamicListingCacheSize())
 
     private fun isPayloadCacheValid(nowMs: Long = System.currentTimeMillis()): Boolean {
         return payloadMemoryCache != null && nowMs - payloadCachedAtMs <= PAYLOAD_CACHE_TTL_MS
@@ -74,6 +74,11 @@ class ExploreRepository(
 
     companion object {
         private const val PAYLOAD_CACHE_TTL_MS = 30_000L
-        private const val MAX_LISTING_CACHE_SIZE = 200
+
+        private fun dynamicListingCacheSize(): Int {
+            val maxMemoryMb = (Runtime.getRuntime().maxMemory() / (1024 * 1024)).toInt()
+            val derived = maxMemoryMb * 2
+            return derived.coerceIn(80, 600)
+        }
     }
 }
