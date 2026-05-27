@@ -6,7 +6,7 @@ import com.example.unimarketfrontend.model.analytics.CampusLocationEventRequest
 import com.example.unimarketfrontend.model.analytics.MessagingResponseEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceEventRequest
 import com.example.unimarketfrontend.model.analytics.PerformanceTelemetryRequest
-import com.example.unimarketfrontend.network.model.AnalyticsEvent
+import com.example.unimarketfrontend.model.analytics.AnalyticsEvent
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST

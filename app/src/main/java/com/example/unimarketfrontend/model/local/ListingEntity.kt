@@ -21,13 +21,3 @@ data class ListingEntity(
     val active: Boolean,
     val primaryImageUrl: String?
 )
-
-@Entity(tableName = "cached_courses")
-data class CachedCourseEntity(
-    @PrimaryKey val id: Int,
-    val code: String,
-    val name: String,
-    val faculty: String,
-    val departmentCode: String,
-    val cachedAt: Long
-)

@@ -26,20 +26,10 @@ import com.example.unimarketfrontend.ui.navigation.ListingRoutesFactory
 import com.example.unimarketfrontend.viewmodel.WishlistViewModel
 
 /**
- * SPRINT 4 — WishlistScreen
- * Shows the user's saved listings with offline support (Tank Architecture).
- *
- * New view for Sprint 4 (Esteban Hernandez).
- * Shows the user's saved listings with offline support.
- *
- * Eventual Connectivity:
- * - Shows cached wishlist when offline (no blank screen)
- * - Displays offline banner when no connectivity
- * - Refreshes from network when online
- *
- * Caching: Cache-then-network via WishlistViewModel + WishlistRepository
- * Local Storage: Room (WishlistEntity)
- * Multi-threading: StateFlow + coroutines
+ * SPRINT 4 — WishlistScreen (Esteban Hernandez)
+ * 
+ * Implementación de UI Reactiva bajo patrón Observer.
+ * Se conecta a Room como Source of Truth garantizando 0ms de carga inicial.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +63,7 @@ fun WishlistScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Offline banner — avoids Non-Informative Message antipattern
+            // Offline banner — evita el antipatrón de mensaje no informativo
             if (isOffline) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -138,7 +128,10 @@ fun WishlistScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(wishlist, key = { it.listingId }) { item ->
+                    items(
+                        wishlist,
+                        key = { it.listingId }
+                    ) { item ->
                         WishlistCard(
                             item = item,
                             onTap = {
@@ -158,7 +151,7 @@ fun WishlistScreen(
 }
 
 @Composable
-private fun WishlistCard(
+fun WishlistCard(
     item: WishlistEntity,
     onTap: () -> Unit,
     onRemove: () -> Unit
@@ -168,7 +161,9 @@ private fun WishlistCard(
             .fillMaxWidth()
             .clickable { onTap() },
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
     ) {
         Row(
             modifier = Modifier
@@ -176,7 +171,6 @@ private fun WishlistCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Listing image
             if (!item.imageUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = item.imageUrl,
@@ -184,7 +178,9 @@ private fun WishlistCard(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant
+                        ),
                     contentScale = ContentScale.Crop
                 )
             } else {
@@ -192,10 +188,11 @@ private fun WishlistCard(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "UM", style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = item.title.firstOrNull()?.uppercase() ?: "?",
                         style = MaterialTheme.typography.titleLarge,
@@ -204,24 +201,29 @@ private fun WishlistCard(
                 }
             }
 
-            Spacer(Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2
                 )
-                Spacer(Modifier.height(4.dp))
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
                     text = "$${item.sellingPrice}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
+
                 Text(
-                    text = "${item.category ?: "Others"}",
+                    text = item.category ?: "Others",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )

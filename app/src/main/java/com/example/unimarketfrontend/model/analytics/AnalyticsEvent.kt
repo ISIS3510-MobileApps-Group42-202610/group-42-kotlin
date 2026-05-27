@@ -1,4 +1,4 @@
-package com.example.unimarketfrontend.network.model
+package com.example.unimarketfrontend.model.analytics
 
 data class AnalyticsEvent(
     val event_name: String,
